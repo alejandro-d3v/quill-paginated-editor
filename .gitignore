@@ -1,28 +1,84 @@
-# Angular specific
+See https://docs.github.com/get-started/getting-started-with-git/ignoring-files
+for more about ignoring files.
+============================================================
+Angular
+============================================================
+
+/.angular/
 /dist/
 /out-tsc/
 /tmp/
-/coverage/
+/bazel-out/
 /e2e/test-output/
-/.angular/
-.angular/
-
-# Node modules and dependency files
-/node_modules/
-/package-lock.json
-/yarn.lock
-
-# Environment files
-/.env
-
-# Angular CLI and build artefacts
-/.angular-cli.json
+/coverage/
 /.ng/
 
-# TypeScript cache
+Angular CLI legacy
+
+/.angular-cli.json
+
+============================================================
+Dependencies
+============================================================
+
+/node_modules/
+
+============================================================
+IDEs and editors
+============================================================
+
+.idea/
+.vscode/
+
+.project
+.classpath
+.c9/
+.settings/
+*.launch
+*.sublime-workspace
+.history/
+
+============================================================
+Environment files
+============================================================
+
+.env
+.env.*
+!.env.example
+
+============================================================
+TypeScript / build cache
+============================================================
+
 *.tsbuildinfo
 
-# Logs
+============================================================
+Sass
+============================================================
+
+.sass-cache/
+
+============================================================
+Logs
+============================================================
+
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+testem.log
+
+============================================================
+Miscellaneous
+============================================================
+
+/connect.lock
+/libpeerconnection.log
+/typings/
+screenshots/
+
+============================================================
+OS generated files
+============================================================
+
+.DS_Store
+Thumbs.db
