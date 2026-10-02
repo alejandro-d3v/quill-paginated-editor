@@ -54,7 +54,7 @@ This is the operational manual for AI coding agents working in this repository. 
 ## 1\. Repository Overview
 
 - **Product**: A paginated document editor built on top of [Quill 2.x](<https://quilljs.com/>) — content is displayed as physical pages (A4/Letter/Legal, orientation, margins, headers/footers, page numbers, page breaks) instead of one continuous editor.
-- **Status**: Experimental MVP under active development. The current app is a scaffold: a root shell with lazy routing, a `home` feature page, and a placeholder `editor` shared component. Quill is installed and its stylesheet is registered, but no component uses it yet. Expect significant API/architecture churn; consult `README.md` and the active spec before large changes.
+- **Status**: Experimental MVP under active development. The app is a root shell with lazy routing plus a `home` feature page hosting the Quill wrapper (`common/components/editor`). The wrapper **is implemented** (`EditorComponent`: snow theme, full toolbar, Quill instantiated in `ngAfterViewInit`) but **does not expose Delta yet** (no `text-change` wiring, no `output()`/signal). Known wrapper debt (redundant `standalone: true`, empty `imports`, no `OnPush`, `@ViewChild`, fake `ngOnDestroy` cleanup, no ARIA, `::ng-deep`) — touch only what the current spec requires (RULE-019); details in `docs/discovery.md` §1.3. No document model, geometry, pagination, measurement, or PDF exists yet. Expect significant API/architecture churn; consult `README.md` and the active spec before large changes.
 
 ### Non-negotiable product principles
 
@@ -133,7 +133,7 @@ tasks.md
 
 ### Naming conventions
 
-- **Component classes**: `App`, `Home`, `Editor` — no `Component` suffix.
+- **Component classes**: no `Component` suffix by default (`App`, `Home`). The suffix is optional — the existing wrapper keeps `EditorComponent` by explicit user decision; do not mass-rename it.
 - **Files**: kebab-case, no type suffix.
 - **Routes**: root `app.routes.ts` exports `routes`; each feature owns `<feature>.routes.ts`.
 - **Selectors**: components `app-<kebab-case>`, directives `app<camelCase>`.
@@ -718,12 +718,6 @@ If a task appears to violate the constitution:
 - Use zoneless `await fixture.whenStable()` patterns.
 - Pure logic such as geometry, pagination calculations, and Delta transforms should generally have focused unit tests.
 - Never break existing tests silently.
-
- Known stale spec:
-
- - `app.spec.ts` currently asserts an `<h1>` that `app.html` no longer renders.
-- Do not treat this as a new regression unless the relevant code is being modified.
-- If touching `App`, reassess and fix the stale assertion.
 
 ---
 
