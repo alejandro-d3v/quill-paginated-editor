@@ -1,48 +1,62 @@
 # AGENTS.md — quill-paginated-editor
 
-This is the operational manual for AI coding agents working in this repository. It is derived from the actual repository configuration and code, not from generic Angular guidance. The repository is the primary source of truth: when this document and the code disagree, verify against the code and prefer the smallest change consistent with both.
+This is the operational manual for AI coding agents working in this repository. It is derived from the actual repository configuration, code, constitution, specifications, and project documentation. The repository is the primary source of truth for implementation details; when this document and the code disagree, verify against the code and prefer the smallest change consistent with both.
 
-**Workflow (mandatory order):** Understand → Analyze → Plan → Implement → Validate.
+**Mandatory engineering workflow:** Understand → Analyze → Plan → Implement → Validate.
 
-**Minimum bar for any change:** `npm run lint` + `npm run build` clean (or honestly reported as not run). Tests when touching tested logic.
-**Session start:** read `MEMORY.md` (state, decisions, pitfalls) before touching code.
-**Session end:** update `MEMORY.md`. See #5 → Memoria.
+**Mandatory spec workflow:** Select Spec → Read Constitution → Read Spec → Read Plan → Read Tasks → Inspect Code → Implement Tasks → Validate → Audit → Update Tasks → Report.
 
-## 0. How to Use This Document
+**Minimum bar for any implementation change:** `npm run lint` \+ `npm run build` clean (or honestly reported as not run). Tests when touching tested logic or when required by the current spec.
+
+**Session start:** read `MEMORY.md` before touching code.
+
+**Session end:** update `MEMORY.md` when the session changes project state, decisions, implementation status, or known pitfalls.
+
+**Spec progression:** implement one spec at a time. Never silently continue into the next spec.
+
+---
+
+## 0\. How to Use This Document
 
 - **You are an AI coding agent** operating in this repository. This file is your contract, not background reading.
-- Read #1 (principles) and #15 (decision making) before any non-trivial change.
+- Read #1 (principles), #5 (agent behavior), #6 (development workflow), #7 (spec-driven development), and #16 (decision making) before any non-trivial change.
 - Section order matters: principles override conventions; conventions override personal preference.
-- When instructions conflict, resolve by #15, not by recency or convenience.
-- For behavior expectations (when to ask, when to propose alternatives, how to respond), see #5.
-- For pre-flight checks, see #16.
+- When instructions conflict, resolve them using #16, not by recency or convenience.
+- For behavior expectations, see #5.
+- For the spec lifecycle, see #7.
+- For pre-flight and final checks, see #15 and #17.
+
+---
 
 ## Table of Contents
 
-1. [Repository Overview](#1-repository-overview)
-2. [Technology Stack](#2-technology-stack)
-3. [Repository Structure](#3-repository-structure)
-4. [Architecture](#4-architecture)
-5. [Agent Behavior](#5-agent-behavior)
-6. [Development Workflow](#6-development-workflow)
-7. [TypeScript Rules](#7-typescript-rules)
-8. [Angular Rules (v21)](#8-angular-rules-v21)
-9. [State Management](#9-state-management)
-10. [RxJS](#10-rxjs)
-11. [Quill Integration](#11-quill-integration)
-12. [UI, Accessibility, and Security](#12-ui-accessibility-and-security)
-13. [Styling, Performance, and Validation](#13-styling-performance-and-validation)
-14. [Infrastructure, Dependencies, and Testing](#14-infrastructure-dependencies-and-testing)
-15. [Validation Commands](#15-validation-commands)
-16. [Decision Making](#16-decision-making)
-17. [Final Checklist](#17-final-checklist)
+1. Repository Overview
+2. Technology Stack
+3. Repository Structure
+4. Architecture
+5. Agent Behavior
+6. Development Workflow
+7. Spec-Driven Development
+8. TypeScript Rules
+9. Angular Rules (v21)
+10. State Management
+11. RxJS
+12. Quill Integration
+13. UI, Accessibility, and Security
+14. Styling, Performance, and Validation
+15. Infrastructure, Dependencies, and Testing
+16. Validation Commands
+17. Decision Making
+18. Final Checklist
 
-## 1. Repository Overview
+---
 
-- **Product**: A paginated document editor built on top of [Quill 2.x](https://quilljs.com/) — content is displayed as physical pages (A4/Letter/Legal, orientation, margins, headers/footers, page numbers, page breaks) instead of one continuous editor.
-- **Status**: Experimental MVP under active development. The current app is a scaffold: a root shell with lazy routing, a `home` feature page, and a placeholder `editor` shared component. Quill is installed and its stylesheet is registered, but no component uses it yet. Expect significant API/architecture churn; consult `README.md` before large changes.
+## 1\. Repository Overview
 
-### Non-negotiable product principles (from README)
+- **Product**: A paginated document editor built on top of [Quill 2.x](<https://quilljs.com/>) — content is displayed as physical pages (A4/Letter/Legal, orientation, margins, headers/footers, page numbers, page breaks) instead of one continuous editor.
+- **Status**: Experimental MVP under active development. The current app is a scaffold: a root shell with lazy routing, a `home` feature page, and a placeholder `editor` shared component. Quill is installed and its stylesheet is registered, but no component uses it yet. Expect significant API/architecture churn; consult `README.md` and the active spec before large changes.
+
+### Non-negotiable product principles
 
 1. **Quill Delta is the source of truth.** The DOM is for rendering and layout measurement only — never the canonical document model.
 2. **Pagination is derived state.** Recompute it from Delta; never mutate the original Delta to paginate.
@@ -52,82 +66,125 @@ This is the operational manual for AI coding agents working in this repository. 
 6. **Keep pagination and PDF generation as separate concerns** from editing.
 7. Prefer small, testable services.
 8. Measure performance before optimizing.
+9. Implement the project incrementally according to the ordered specifications in `/specs`.
 
-## 2. Technology Stack
+---
+
+## 2\. Technology Stack
 
 **Observed — in use (verified in `package.json`, `angular.json`, `eslint.config.mjs`):**
 
-| Technology     | Version                                                                                                         | Notes                                                                       |
-| -------------- | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| Angular        | ^21.2                                                                                                           | Standalone APIs, signals, zoneless (no `zone.js` dependency).               |
-| TypeScript     | ~5.9                                                                                                            | `strict` + strict Angular compiler options.                                 |
-| Quill          | ^2.0.3                                                                                                          | Editor engine. Snow theme CSS registered globally in `angular.json`.        |
-| RxJS           | ~7.8                                                                                                            | Available; almost no usage yet.                                             |
-| SCSS           | —                                                                                                               | Global (`src/styles.scss`) + colocated component styles.                    |
-| ESLint         | 10 + angular-eslint 22 + typescript-eslint 8 (`strictTypeChecked`, `stylisticTypeChecked`) + simple-import-sort | Major source of project conventions.                                        |
-| Prettier       | 3.9                                                                                                             | Formatting: 100 cols, single quotes, semicolons, trailing commas `es5`, LF. |
-| Vitest + jsdom | via `@angular/build:unit-test`                                                                                  | `npm test`; specs use vitest globals.                                       |
+| Technology | Version | Notes |
+| --- | --- | --- |
+| Angular | ^21.2 | Standalone APIs, signals, zoneless (no `zone.js` dependency). |
+| TypeScript | \~5.9 | `strict` \+ strict Angular compiler options. |
+| Quill | ^2.0.3 | Editor engine. Snow theme CSS registered globally in `angular.json`. |
+| RxJS | \~7.8 | Available; almost no usage yet. |
+| SCSS | — | Global (`src/styles.scss`) + colocated component styles. |
+| ESLint | 10 + angular-eslint 22 + typescript-eslint 8 | `strictTypeChecked`, `stylisticTypeChecked`, simple-import-sort. |
+| Prettier | 3.9 | Formatting: 100 cols, single quotes, semicolons, trailing commas `es5`, LF. |
+| Vitest + jsdom | via `@angular/build:unit-test` | `npm test`; specs use Vitest globals. |
 
 **Available but not yet used** (do not treat as established): `@angular/forms` (prefer Reactive Forms when forms appear), RxJS patterns, `NgOptimizedImage` (no images yet). `provideHttpClient` is **not** configured.
 
 **Not present — do not introduce without explicit justification**: SSR/server rendering, NgRx or any state library, Tailwind or any CSS/utility framework, UI component libraries, environment files, HTTP/API layer, CI/CD, Docker. None of these exist in the repository today.
 
-## 3. Repository Structure
+---
+
+## 3\. Repository Structure
 
 ```
 src/
-├── index.html                  # SPA shell, <app-root>
-├── main.ts                     # bootstrapApplication (client-only)
-├── styles.scss                 # global styles (currently empty)
+├── index.html
+├── main.ts
+├── styles.scss
 └── app/
-    ├── app.ts|html|scss|spec   # root shell: <router-outlet /> only
-    ├── app.config.ts            # provideBrowserGlobalErrorListeners + provideRouter
-    ├── app.routes.ts            # lazy loadChildren per feature; '**' → ''
-    ├── common/                  # cross-feature, reusable code
-    │   └── components/editor/   # intended Quill wrapper (placeholder)
-    └── home/                    # feature folder
-        ├── home.routes.ts       # exports HOME_ROUTES
-        └── pages/home/          # feature page (placeholder)
-public/                          # static assets copied verbatim (favicon.ico)
+    ├── app.ts|html|scss|spec
+    ├── app.config.ts
+    ├── app.routes.ts
+    ├── common/
+    │   └── components/editor/
+    └── home/
+        ├── home.routes.ts
+        └── pages/home/
+
+specs/
+├── 00-discovery/
+├── 01-document-model/
+├── 02-page-geometry/
+├── 03-visual-pages/
+├── 04-pagination-mvp/
+├── 05-content-splitting/
+├── 06-complex-blocks/
+├── 07-manual-page-breaks/
+├── 08-header-footer/
+├── 09-pdf/
+├── 10-performance/
+└── 11-testing/
 ```
 
-### Naming conventions (observed)
+Each spec directory normally contains:
 
-- **Component classes**: `App`, `Home`, `Editor` — no `Component` suffix (Angular v20+ style guide).
-- **Files**: kebab-case, no type suffix — `home.ts`, `home.html`, `home.scss`, `home.spec.ts` — colocated siblings sharing a basename. `templateUrl`/`styleUrl` paths are relative to the component TS file.
-- **Routes**: root `app.routes.ts` exports `routes`; each feature owns `<feature>.routes.ts` exporting a `<FEATURE>_ROUTES` constant (e.g. `HOME_ROUTES`), lazy-loaded via `loadChildren`; pages lazy-loaded via `loadComponent`.
-- **Selectors**: components `app-<kebab-case>` (element), directives `app<camelCase>` (attribute). Prefix `app` enforced by ESLint and `angular.json`.
+```
+spec.md
+plan.md
+tasks.md
+```
+
+### Naming conventions
+
+- **Component classes**: `App`, `Home`, `Editor` — no `Component` suffix.
+- **Files**: kebab-case, no type suffix.
+- **Routes**: root `app.routes.ts` exports `routes`; each feature owns `<feature>.routes.ts`.
+- **Selectors**: components `app-<kebab-case>`, directives `app<camelCase>`.
 - **No barrel files** (`index.ts`).
-- **Imports**: no path aliases resolve today — use relative imports. ESLint's import-sort reserves a group for a future `@common` alias, but `tsconfig.json` has no `paths` mapping, so `@common/...` imports will not compile unless that mapping is deliberately added first.
-- **Import order** (ESLint error): Angular first, then third-party, then internal aliases, then parent/sibling relative imports. `npm run lint:fix` auto-fixes ordering.
+- **Imports**: no path aliases resolve today — use relative imports.
+- **Import order**: Angular first, then third-party, then internal aliases, then parent/sibling relative imports.
 
-## 4. Architecture
+---
 
-Current architecture is minimal and **feature-based**:
+## 4\. Architecture
+
+Current architecture is minimal and feature-based:
 
 - `app/` — root shell, global providers, top-level routing.
-- `<feature>/` — self-contained lazy-loaded feature folders (`home/` today) containing `pages/`.
-- `common/` — reusable, feature-agnostic code (the `editor` wrapper today; future layout/pagination services belong here).
+- `<feature>/` — self-contained lazy-loaded feature folders.
+- `common/` — reusable, feature-agnostic code.
 
-Target domain architecture (README, guiding principle — not yet implemented):
+Target domain architecture:
 
 ```
-Quill Editor → Delta → Document Model → Pagination Engine → { Paginated View, PDF Renderer }
+Quill Editor
+     ↓
+   Delta
+     ↓
+Document Model
+     ↓
+Pagination Engine
+     ↓
+ ┌───────────────┬───────────────┐
+ ↓               ↓
+Paginated View   PDF Renderer
 ```
 
-- Quill integration lives behind an Angular wrapper component (`common/components/editor`); the rest of the app interacts through `input()`/`output()` and signals.
-- Pagination logic belongs in standalone services (layout/pagination), decoupled from the editor component and from rendering.
-- Treat Delta as the model and pagination output as derived view state (recomputed, not stored as a second source of truth).
-- **API/data access**: none exists (`provideHttpClient` is not configured). If a backend is introduced, isolate HTTP in `providedIn: 'root'` services with strongly typed request/response models, and treat responses as untrusted data. Ask before building a large data layer.
-- SOLID and modular design are guidelines, not ceremonies. Use the simplest architecture that keeps responsibilities clear; avoid abstractions the current MVP complexity does not justify.
+- Quill integration lives behind an Angular wrapper component (`common/components/editor`).
+- The rest of the application interacts with the editor through `input()`/`output()` and signals.
+- Pagination logic belongs in standalone services, decoupled from the editor component and rendering.
+- Delta is the canonical model.
+- Pagination output is derived state.
+- DOM measurement is an implementation mechanism, not a source of truth.
+- PDF generation is a separate concern from interactive pagination.
+- API/data access does not currently exist.
 
-## 5. Agent Behavior
+---
 
-Behavioral rules for how to act, ask, and respond. These override convenience.
+## 5\. Agent Behavior
 
 ### Autonomy
 
-Act autonomously when the repository provides sufficient context; make reasonable engineering decisions and continue. Ask the user only when:
+Act autonomously when the repository provides sufficient context.
+
+Ask the user only when:
 
 - Critical information is missing.
 - Requirements conflict.
@@ -135,218 +192,717 @@ Act autonomously when the repository provides sufficient context; make reasonabl
 - A destructive or breaking change is required.
 - A major architectural decision cannot reasonably be inferred.
 - Secrets or credentials are needed.
+- A spec is internally contradictory and no safe interpretation exists.
+
+Do **not** ask unnecessary questions when the constitution, active spec, existing code, or established architecture already provides the answer.
 
 ### Better alternatives
 
-Do not blindly implement a technically inferior request, and do not replace technologies based on personal preference. Identify the issue, explain the trade-off, propose the alternative, and choose it when the context clearly supports it.
+Do not blindly implement a technically inferior request, and do not replace technologies based on personal preference.
+
+If the requested approach conflicts with the constitution, active spec, or established architecture:
+
+1. Identify the conflict.
+2. Explain the concrete technical issue.
+3. Propose the smallest compatible alternative.
+4. Implement the alternative only when the intended behavior is unambiguous.
+5. Otherwise stop and report the conflict.
+
+### Scope discipline
+
+During implementation:
+
+- Work only on the current task/spec.
+- Do not implement future specs "because they will be needed later".
+- Do not refactor unrelated code.
+- Do not rewrite architecture without justification.
+- Do not introduce speculative abstractions.
+- Do not add dependencies unless required.
+- Do not modify configuration merely to make implementation easier.
+- Do not mark work complete without validation.
 
 ### Response format
 
 Structure implementation responses as:
 
-1. **Requirement Analysis** — brief understanding of the request.
-2. **Technical Approach** — chosen strategy.
-3. **Implementation Plan** — files and expected changes (before modifying code).
-4. **Implementation** — what changed.
-5. **Validation** — what was verified and which commands actually ran.
-6. **Risks and Considerations** — limitations and future concerns.
+1. **Requirement Analysis**
+2. **Technical Approach**
+3. **Implementation Plan**
+4. **Implementation**
+5. **Validation**
+6. **Risks and Considerations**
 
-Abbreviate freely for trivial changes.
+ Abbreviate freely for trivial changes.
 
-### Memoria
+---
 
-- Al empezar, lee `MEMORY.md` para conocer el estado del proyecto y las decisiones tomadas.
-- Al terminar una tarea, actualízalo: estado actual, decisiones importantes (con su porqué) y errores a evitar.
-- Mantenlo breve (máximo ~50 líneas): resume o elimina lo que ya no aporte.
-- Si algo se convierte en una regla permanente, propón moverlo a `AGENTS.md` en lugar de dejarlo en la memoria.
-- No guardes nunca datos sensibles (claves, tokens, datos personales).
+## 6\. Development Workflow
 
-## 6. Development Workflow
+All implementation work follows:
 
-Work in this order: **Understand → Analyze → Plan → Implement → Validate**.
+```
+Understand
+    ↓
+Analyze
+    ↓
+Plan
+    ↓
+Implement
+    ↓
+Validate
+```
+
+For spec-driven work, use:
+
+```
+Select Spec
+    ↓
+Read Constitution
+    ↓
+Read Spec
+    ↓
+Read Plan
+    ↓
+Read Tasks
+    ↓
+Inspect Existing Code
+    ↓
+Identify Dependencies / Gaps
+    ↓
+Implement Current Tasks
+    ↓
+Validate
+    ↓
+Audit Against Requirements
+    ↓
+Update Tasks
+    ↓
+Update MEMORY.md if needed
+    ↓
+Report
+```
 
 ### Understand
 
-Inspect the relevant implementation, `angular.json`, `eslint.config.mjs`, `tsconfig*.json`, and this file before changing anything. Do not assume technologies or patterns the repository does not demonstrate (e.g., no NgRx, no Tailwind, no SSR).
+Inspect the relevant implementation and configuration before changing anything.
+
+At minimum, consider:
+
+- `docs/constitution.md`
+- `README.md`
+- `MEMORY.md`
+- relevant `spec.md`
+- relevant `plan.md`
+- relevant `tasks.md`
+- relevant skills under `.agents/skills/`
+- affected source files
+- `angular.json`
+- `eslint.config.mjs`
+- `tsconfig*.json`
+- `package.json`
 
 ### Analyze
 
-Identify requirements, affected files, dependencies, and side effects. In this project, pagination changes affect rendering, measurement, content integrity, and eventually PDF output — reason about those explicitly.
+Identify:
+
+- requirements;
+- affected files;
+- dependencies;
+- architectural constraints;
+- side effects;
+- validation requirements;
+- potential conflicts with later architecture.
+
+For pagination changes, explicitly reason about:
+
+- Delta integrity;
+- rendered geometry;
+- measurement;
+- pagination boundaries;
+- content splitting;
+- visual rendering;
+- eventual PDF output.
 
 ### Plan
 
-Before modifying code, state:
+Before modifying code, determine:
 
-1. Requirement understanding
-2. Technical approach
-3. Files expected to change
-4. Key implementation decisions and risks
+1. What the current requirement means.
+2. Which existing code participates.
+3. Which files are expected to change.
+4. Which tasks are being implemented.
+5. Which decisions are required.
+6. Which risks need validation.
 
-Trivial changes need a one-line plan; large changes need a detailed one.
+Do not create an unnecessarily elaborate plan for trivial changes.
 
 ### Implement
 
-Deliver the smallest coherent change that solves the problem. Do not refactor unrelated code, rename things, upgrade dependencies, change configuration, or format files you did not otherwise touch.
+Implement the smallest coherent change that satisfies the current requirement.
 
 ### Validate
 
-See #15 for commands. Review for correctness, strict TypeScript, Angular conventions, ESLint, accessibility, security, performance, and architectural consistency. **Never claim a command was executed unless it actually was.**
+Run the relevant checks described in #16.
 
-## 7. TypeScript Rules
+Never claim a command was executed unless it actually was.
 
-Configuration: `strict: true`, `strictTemplates`, `strictInjectionParameters`, `strictInputAccessModifiers`, `noImplicitOverride`, `noImplicitReturns`, `noFallthroughCasesInSwitch`, `noPropertyAccessFromIndexSignature`, `isolatedModules` (target ES2022).
+---
 
-- **No `any`** (ESLint error). Use concrete types, or `unknown` with narrowing. Type Quill structures (Delta, ops) explicitly.
-- Prefer type inference where the type is obvious; annotate return types on functions and methods (ESLint warns; inline callbacks and already-typed expressions are exempt).
+# 7\. Spec-Driven Development
+
+The `/specs` directory defines the project's incremental implementation roadmap.
+
+The current intended progression is:
+
+```
+00-discovery
+    ↓
+01-document-model
+    ↓
+02-page-geometry
+    ↓
+03-visual-pages
+    ↓
+04-pagination-mvp
+    ↓
+05-content-splitting
+    ↓
+06-complex-blocks
+    ↓
+07-manual-page-breaks
+    ↓
+08-header-footer
+    ↓
+09-pdf
+    ↓
+10-performance
+    ↓
+11-testing
+```
+
+The exact dependencies must be verified from the specs themselves. Do not assume that a later spec can safely be implemented before its prerequisites.
+
+## 7.1 Source-of-truth hierarchy
+
+When deciding what to implement, use this priority:
+
+1. `docs/constitution.md`
+2. The active `spec.md`
+3. The active `plan.md`
+4. The active `tasks.md`
+5. Existing architecture and code
+6. `README.md`
+7. `AGENTS.md` implementation conventions
+8. Official framework/library documentation
+9. Personal engineering preference
+
+This hierarchy applies to **feature requirements**.
+
+Security, correctness, and explicit user requirements still override ordinary implementation conventions as described in #17.
+
+If two authoritative documents contradict each other, do not silently choose one. Identify the contradiction and resolve it using #17 or ask the user when necessary.
+
+## 7.2 One spec at a time
+
+An agent MUST implement **one spec at a time**.
+
+When asked to implement a spec:
+
+- Read its `spec.md`, `plan.md`, and `tasks.md`.
+- Inspect the current repository state.
+- Implement only that spec.
+- Complete its tasks in dependency order.
+- Validate the result.
+- Audit the implementation against the spec.
+- Update its `tasks.md`.
+- Report the result.
+
+The agent MUST NOT automatically start the next spec.
+
+Even when the current spec is completed successfully, stop at its boundary and report completion.
+
+## 7.3 Never skip the constitution
+
+Before implementing any spec, read:
+
+```
+docs/constitution.md
+```
+
+The constitution defines project-level principles and constraints.
+
+If a task appears to violate the constitution:
+
+- do not silently work around it;
+- identify the conflict;
+- determine whether the task has a safe interpretation;
+- otherwise stop and report the conflict.
+
+ ## 7.4 Spec contract
+
+ The active spec defines **what must be achieved**.
+
+ The plan defines **how the spec is expected to be decomposed**.
+
+ The tasks define **the execution checklist**.
+
+ Do not treat `tasks.md` as the only source of requirements. A task may be incomplete even when every checkbox is marked if the acceptance criteria in `spec.md` are not satisfied.
+
+ Likewise, do not invent new requirements merely because they appear technically convenient.
+
+ ## 7.5 Pre-implementation spec audit
+
+ Before implementation, verify:
+
+ - Are the requirements internally consistent?
+- Are acceptance criteria testable?
+- Are task dependencies clear?
+- Does the existing code provide the expected foundation?
+- Does the implementation conflict with earlier completed specs?
+- Does the spec depend on a feature that is not implemented?
+- Is any requirement ambiguous enough to materially change architecture?
+
+ If a problem is minor and can be resolved from existing project principles, resolve it using #17.
+
+ If it materially changes architecture or product behavior, report it before implementation.
+
+ ## 7.6 Task execution
+
+ Tasks should normally be executed in the order defined by `tasks.md`.
+
+ Before each task:
+
+ - understand its purpose;
+- identify affected code;
+- verify prerequisites;
+- implement only the necessary changes.
+
+ A task can be considered complete only when:
+
+ - its implementation exists;
+- its acceptance criteria are satisfied;
+- relevant validation passes;
+- no known blocking issue remains.
+
+ Do not mark tasks complete merely because code was written.
+
+ ## 7.7 Future-spec isolation
+
+ Do not implement future functionality simply because it seems useful.
+
+ Examples:
+
+ - Do not implement manual page breaks during pagination MVP.
+- Do not implement headers/footers while building basic page geometry unless the current spec explicitly requires the foundation.
+- Do not implement PDF-specific abstractions while building interactive pagination unless required by the active spec.
+- Do not optimize pagination before performance requirements are active.
+- Do not introduce complex block splitting before the relevant spec.
+
+ However, architecture may expose clean extension points when doing so does not introduce speculative functionality.
+
+ ## 7.8 Handling incomplete specifications
+
+ If the active spec requires a prerequisite that is missing:
+
+ 1. Check whether the prerequisite belongs to an earlier spec.
+2. Check whether it is actually required or only assumed.
+3. Determine whether the smallest compatible implementation can be added without violating scope.
+4. If yes, implement the minimum necessary foundation and document it.
+5. If no, stop and report the dependency.
+
+ Do not silently implement an entire previous or future spec.
+
+ ## 7.9 Updating tasks
+
+ After implementation:
+
+ - Mark only genuinely completed tasks.
+- Do not mark tasks as complete if validation failed.
+- Do not mark tasks complete because the code "looks correct".
+- Preserve unfinished tasks.
+- If implementation reveals a task that is incorrectly specified, document the discrepancy rather than hiding it.
+
+ If task wording needs correction, make the smallest documentation change necessary and report it.
+
+ ## 7.10 Spec completion criteria
+
+ A spec is complete only when:
+
+ - Its acceptance criteria are implemented.
+- Its required tasks are complete.
+- Relevant tests pass.
+- `npm run lint` passes.
+- `npm run build` passes.
+- No known blocking issue remains.
+- `tasks.md` accurately reflects reality.
+- The implementation does not violate the constitution.
+- No accidental future-spec functionality was introduced.
+
+ A spec may be reported as **partially complete** when implementation is blocked or validation is incomplete.
+
+---
+
+ ## 8\. TypeScript Rules
+
+ Configuration: `strict: true`, `strictTemplates`, `strictInjectionParameters`, `strictInputAccessModifiers`, `noImplicitOverride`, `noImplicitReturns`, `noFallthroughCasesInSwitch`, `noPropertyAccessFromIndexSignature`, `isolatedModules` (target ES2022).
+
+ - **No `any`**. Use concrete types, or `unknown` with narrowing.
+- Type Quill structures explicitly.
+- Prefer type inference where obvious; annotate return types on functions and methods.
 - Prefix intentionally unused identifiers with `_`.
-- Every promise must be correctly handled (`no-floating-promises`, `no-misused-promises`, `await-thenable` are errors). Handle errors explicitly in all async measurement/pagination paths.
-- Use `??` and `?.` (not `||` and chained guards), `===` only (`eqeqeq`), braces on all control statements (`curly`).
-- Index-signature properties require bracket notation (`noPropertyAccessFromIndexSignature`) — relevant for Delta ops and document settings objects.
+- Every promise must be correctly handled.
+- Use `??` and `?.`, not `||` and chained guards.
+- Use `===` only.
+- Use braces on all control statements.
+- Index-signature properties require bracket notation.
 - `console.warn`/`console.error` only; no `console.log`, no `debugger`.
-- Do not pass unbound instance methods as callbacks (`unbound-method`).
-- No placeholder/static-only classes (Angular-decorated classes are exempt).
-- ESLint is important project guidance but not absolute authority over correctness. Never disable a rule to make weak code pass, and do not modify `eslint.config.mjs` unless explicitly requested.
+- Do not pass unbound instance methods as callbacks.
+- No placeholder/static-only classes.
+- Do not disable ESLint rules merely to make weak code pass.
+- Do not modify `eslint.config.mjs` unless explicitly required.
 
-## 8. Angular Rules (v21)
+---
 
-- **Standalone by default.** Do NOT write `standalone: true` — it has been redundant since v20. (`Home` and `Editor` still carry the leftover flag from scaffolding: remove it when already editing those files; do not mass-edit.) No NgModules.
-- **Zoneless**: there is no `zone.js`. Rely on signals for change propagation; do not add zone.js.
-- Use `OnPush` on new components (`@angular-eslint/prefer-on-push-component-change-detection` warns; scaffolded components predate the rule).
-- Modern APIs only: `input()`, `output()`, `computed()`, `signal()`, `inject()`, signal-based view queries. Not `@Input()`/`@Output()` decorators. Host bindings/listeners go in the `host` object of `@Component`/`@Directive`, never `@HostBinding`/`@HostListener`.
-- DI: `inject()` instead of constructor injection. Services: single responsibility, `providedIn: 'root'`.
-- Templates: native control flow only (`@if`, `@for` with `track`, `@switch`) — `*ngIf`/`*ngFor`/`*ngSwitch` are ESLint errors. No negated `async` pipe (`@if (!(x | async))` is an error). Prefer self-closing tags (`<router-outlet />`).
-- Keep templates simple; move logic into the component. Use `async` pipe for observables. Do not call browser globals (e.g. `new Date()`) in templates — pass values from code.
-- External template/style files are the established convention here (colocated siblings); inline templates are acceptable for genuinely tiny components.
-- Route lazily: features via `loadChildren` → `<FEATURE>_ROUTES`; pages via `loadComponent`. Add new features as siblings of `home/`, never inside another feature.
-- No `ngClass`/`ngStyle` — use `class`/`style` bindings. Prefer Reactive Forms over template-driven forms when forms are introduced.
-- Use `NgOptimizedImage` for static images (it does not work for inline base64 images).
+ ## 9\. Angular Rules (v21)
 
-## 9. State Management
+ - **Standalone by default.** Do NOT write `standalone: true`.
+- No NgModules.
+- Use `OnPush` on new components.
+- Use `input()`, `output()`, `computed()`, `signal()`, `inject()`.
+- Do not use `@Input()`/`@Output()` decorators for new code.
+- Host bindings/listeners go in the `host` object.
+- DI uses `inject()`.
+- Services use `providedIn: 'root'` unless a narrower scope is explicitly justified.
+- Use native control flow: `@if`, `@for` with `track`, `@switch`.
+- Do not use `*ngIf`, `*ngFor`, or `*ngSwitch`.
+- Prefer self-closing tags.
+- Keep templates simple.
+- Do not call browser globals directly from templates.
+- Use external templates/styles by default.
+- Lazy-load features and pages.
+- No `ngClass`/`ngStyle`.
+- Prefer Reactive Forms when forms are introduced.
 
-- Use signals for all local component and service state; `computed()` for derived state.
-- Keep transformations pure and predictable; change state only via `.set()`/`.update()`.
-- Expose template-bound state as `protected readonly` signals (see `App.title`).
-- No NgRx or other state libraries — do not introduce one without explicit justification. The document state is the Quill Delta; pagination is derived from it, not stored.
-- Shared state that outgrows a component belongs in a `providedIn: 'root'` service exposing signals.
+---
 
-## 10. RxJS
+ ## 10\. State Management
 
-- RxJS ~7.8 is available but barely used. Consume framework observables with `async` pipe or `toSignal` (in injection context); avoid manual subscriptions and leaks (`takeUntilDestroyed` when subscribing in services).
-- Do not wrap callback-based Quill APIs in observables without a concrete need — signals and plain event handlers are fine.
+ - Use signals for local component and service state.
+- Use `computed()` for derived state.
+- Expose template-bound state as `protected readonly` signals where appropriate.
+- No NgRx or other state libraries without explicit justification.
+- Document state is the Quill Delta.
+- Pagination is derived from document state.
+- Do not create a second mutable canonical document representation.
+- Shared state belongs in focused services.
 
-## 11. Quill Integration
+---
 
-Observed: Quill ^2.0.3 is a dependency and `quill.snow.css` is registered globally in `angular.json`; no component uses Quill yet. `common/components/editor` is the intended wrapper (currently a placeholder).
+ ## 11\. RxJS
 
-- Quill is a browser/DOM library: instantiate it only after the view exists (`afterNextRender`/`afterRenderEffect`, or `ngAfterViewInit` with a signal view-child ref) — never in field initializers or constructors.
-- The wrapper component owns the Quill instance; the rest of the app consumes Delta and events through `input()`/`output()` and signals.
-- Extend Quill in this order before ever considering a fork: Quill APIs → Quill modules → custom Blots → application-level services/CSS.
-- Delta is the model; the DOM is measurement/render only. Pagination reads rendered geometry and never rewrites Delta (#1 principles).
-- Editor content is untrusted user input (see #12 Security).
-- When a Quill API is uncertain, consult the official **Quill 2.x** docs — Quill 1.x examples are widespread online and wrong for this project.
+ - RxJS \~7.8 is available but barely used.
+- Prefer `async` pipe or `toSignal`.
+- Avoid manual subscriptions when unnecessary.
+- Use `takeUntilDestroyed` when subscriptions are genuinely required.
+- Do not wrap callback-based Quill APIs in observables without a concrete need.
 
-## 12. UI, Accessibility, and Security
+---
 
-### Accessibility (first-class; ESLint `templateAccessibility` is enabled)
+ ## 12\. Quill Integration
 
-- Target WCAG AA; changes must pass AXE checks.
-- Semantic HTML, full keyboard navigation, visible focus management, correct labels, accessible error/loading states.
-- Prefer native HTML semantics over unnecessary ARIA. Real `<button>`/`<a>` elements for interactive controls, never styled `<div>`s.
-- The editor surface needs explicit care: `contenteditable` regions require proper semantics (e.g., `role="textbox"`, `aria-label`, `aria-multiline`) and custom behaviors must not break keyboard support.
+ Observed: Quill ^2.0.3 is installed and Snow theme CSS is registered globally.
 
-### Security
+ - Instantiate Quill only after the view exists.
+- The editor wrapper owns the Quill instance.
+- The rest of the application consumes Delta and events through explicit component APIs.
+- Extend Quill in this order:
+  1. Quill APIs
+  2. Quill modules
+  3. Custom Blots
+  4. Application services/CSS
+  5. Quill fork only with explicit user approval
+- Delta is the canonical document model.
+- DOM is for rendering and measurement only.
+- Pagination must never mutate the canonical Delta.
+- Do not paginate by character count.
+- Never silently discard content.
+- When uncertain about Quill behavior, consult official Quill 2.x documentation.
 
-- Never put secrets, API keys, or credentials in frontend code. No environment files exist; do not fabricate them without a requirement.
-- All editor/API content is untrusted: render it through Angular's sanitization; avoid `bypassSecurityTrust*`. If rendering Quill-generated HTML ever requires it, sanitize/validate the source and state the decision explicitly.
-- Never log document content or user data.
-- No raw `innerHTML` DOM manipulation in TypeScript — use Angular bindings or Quill's own API.
+---
 
-## 13. Styling, Performance, and Validation
+ ## 13\. UI, Accessibility, and Security
 
-### Styling
+ ### Accessibility
 
-- SCSS only (schematics default, `inlineStyleLanguage: scss`). Global styles in `src/styles.scss`; colocated `.scss` per component.
-- Quill's Snow theme CSS is already global — do not re-import it per component.
-- No Tailwind, no CSS frameworks, no CSS-in-JS.
-- No design tokens exist yet. Page geometry (sizes, margins) is a product concept: when styling grows, define shared SCSS variables/mixins for it instead of scattering magic numbers, and keep it configurable (see `DocumentSettings` in README).
-- Formatting is Prettier's job (`npm run format`) — do not hand-format unrelated code.
-- The editor targets fixed document geometry; don't force mobile-responsive patterns onto page rendering. Surrounding UI should still behave sensibly at smaller widths.
+ - Target WCAG AA.
+- Use semantic HTML.
+- Support keyboard navigation.
+- Maintain visible focus.
+- Use correct labels and accessible states.
+- Prefer native semantics over unnecessary ARIA.
+- Real `<button>`/`<a>` elements for interactive controls.
+- Editor surfaces require appropriate textbox semantics and keyboard behavior.
 
-### Performance
+ ### Security
 
-Production budgets are enforced by `npm run build`: initial bundle warn **500 kB** / error **1 MB**; any component style warn **4 kB** / error **8 kB**. Don't ship changes that break budgets; raise limits only with explicit justification.
+ - Never put secrets or credentials in frontend code.
+- Treat document/editor content as untrusted.
+- Use Angular sanitization.
+- Avoid `bypassSecurityTrust*`.
+- Do not use raw `innerHTML` manipulation in TypeScript.
+- Do not log document content or user data.
 
-- Keep every route lazy (established via `loadChildren`/`loadComponent`).
-- `OnPush` + signals; `track` every `@for`.
-- Pagination is measurement-heavy: batch/debounce recomputation during rapid editing, group DOM reads before writes to avoid layout thrash, cache measurements where safe.
-- No premature optimization — measure first (README principle 10).
-- Static images via `NgOptimizedImage`; avoid heavy base64 payloads.
+---
 
-### SSR / SEO / Environments
+ ## 14\. Styling, Performance, and Validation
 
-Not configured, by current design: `main.ts` uses `bootstrapApplication` (CSR only), no server build, no hydration, and the app is a tool rather than a public content site. Browser APIs are safe at runtime, but keep Quill/DOM access in view lifecycle hooks so a future SSR story remains possible. Do not add SSR, hydration, SEO metadata, or environment files unless explicitly requested.
+ ### Styling
 
-## 14. Infrastructure, Dependencies, and Testing
+ - SCSS only.
+- Global styles belong in `src/styles.scss`.
+- Component styles are colocated.
+- Do not re-import Quill Snow CSS per component.
+- No Tailwind or CSS frameworks.
+- Avoid scattering page-geometry magic numbers.
+- Formatting is Prettier's responsibility.
+- Do not hand-format unrelated code.
+- Keep document pages physically accurate rather than forcing responsive layouts onto them.
 
-### Infrastructure
+ ### Performance
 
-- Builder: `@angular/build:application` (esbuild-based). `npm run build` defaults to production; `npm start` defaults to development.
-- Package manager: **npm** (pinned `npm@10.9.3` via `packageManager`). Do not introduce other managers/lockfiles.
-- `.editorconfig` + `.prettierrc`: 2-space indent, UTF-8, LF, single quotes.
-- `public/` is copied verbatim to the build output; reference assets with absolute paths.
-- No CI/CD, Docker, or deployment configuration exists. Do not invent deployment conventions; touch these only on explicit request.
+ Production budgets are enforced by `npm run build`:
 
-### Dependencies
+ - Initial bundle warning: **500 kB**
+- Initial bundle error: **1 MB**
+- Component style warning: **4 kB**
+- Component style error: **8 kB**
 
-README policy: dependencies are kept to a minimum and introduced only when they provide clear value. Therefore:
+ Do not increase budgets without explicit justification.
 
-- Reuse what exists (Angular, Quill, RxJS, SCSS) before adding anything.
-- Verify Angular 21 compatibility and bundle cost before adding a package; no alpha or unmaintained packages; no upgrades unless required for the task.
-- Do not add state libraries, UI kits, or utility libraries (e.g., lodash) by default.
+ Pagination is measurement-heavy:
 
-### Testing
+ - batch/debounce recomputation where appropriate;
+- group DOM reads before writes;
+- avoid layout thrashing;
+- cache measurements only when correctness is preserved;
+- measure before optimizing.
 
-- Stack: Vitest + jsdom via `@angular/build:unit-test` (`npm test`). Specs are colocated `*.spec.ts`, use vitest globals (`describe`/`it`/`expect`), TestBed, and the zoneless `await fixture.whenStable()` pattern.
-- Tests are **not mandatory** for every change and spec files are excluded from ESLint — but never break existing specs, and for pure logic (pagination math, geometry, Delta transforms) a spec is the cheapest validation.
-- Known-stale spec: `app.spec.ts` asserts an `<h1>` ("Hello, quill-paginated-editor") that `app.html` no longer renders. Don't be surprised by it; fix it if you touch `App`'s template, otherwise leave it alone.
+ Do not prematurely optimize.
 
-## 15. Validation Commands
+---
 
-Real commands from `package.json` — do not invent others:
+ ## 15\. Infrastructure, Dependencies, and Testing
 
-- `npm run lint` — ESLint over all `.ts` (spec files excluded) with full type information. `npm run lint:fix` auto-fixes.
-- `npm run build` — production build; full type/template checking plus budget enforcement.
-- `npm test` — Vitest unit tests.
-- `npm run format:check` — Prettier check (`npm run format` to fix).
+ ### Infrastructure
 
-Minimum bar for any change: **lint + build clean**. Run tests when the change touches tested logic. If you cannot run a command, validate by careful review and say so explicitly.
+ - Builder: `@angular/build:application`.
+- Package manager: npm.
+- Do not introduce other package managers or lockfiles.
+- No CI/CD, Docker, deployment, or server configuration exists.
+- Do not invent infrastructure conventions.
 
-## 16. Decision Making
+ ### Dependencies
 
-Resolve conflicts by this priority order:
+ - Reuse existing dependencies first.
+- Verify Angular 21 compatibility before adding packages.
+- Avoid alpha/unmaintained packages.
+- Do not upgrade dependencies unless required.
+- Do not add state libraries, UI kits, utility libraries, or rendering frameworks without explicit justification.
 
-1. Security and correctness (including the #1 content-integrity principles)
-2. Explicit user requirements
-3. Existing repository architecture and conventions (this file)
-4. Current official Angular/TypeScript recommendations
-5. Project configuration and tooling (tsconfig, ESLint, budgets)
-6. Maintainability and scalability
-7. Performance, accessibility, and SEO where relevant
-8. Personal stylistic preference (never a reason on its own)
+ ### Testing
 
-Consult official documentation first when an API is uncertain or may have changed: [angular.dev](https://angular.dev/), [typescriptlang.org](https://www.typescriptlang.org/), [quilljs.com](https://quilljs.com/) (Quill 2.x). Prefer official docs over blog posts — much online Angular content predates v20 standalone-by-default and is wrong for this codebase.
+ - Stack: Vitest + jsdom via `@angular/build:unit-test`.
+- Specs are colocated `*.spec.ts`.
+- Use Vitest globals.
+- Use TestBed where appropriate.
+- Use zoneless `await fixture.whenStable()` patterns.
+- Pure logic such as geometry, pagination calculations, and Delta transforms should generally have focused unit tests.
+- Never break existing tests silently.
 
-## 17. Final Checklist
+ Known stale spec:
 
-Before finishing any change:
+ - `app.spec.ts` currently asserts an `<h1>` that `app.html` no longer renders.
+- Do not treat this as a new regression unless the relevant code is being modified.
+- If touching `App`, reassess and fix the stale assertion.
 
-- [ ] Smallest coherent diff; no unrelated refactors, renames, formatting, dependency, or config churn.
-- [ ] No modifications to `eslint.config.mjs`, `tsconfig*.json`, `angular.json`, or `package.json` unless the task explicitly requires it.
-- [ ] No new dependency, state library, UI kit, or SSR/env file introduced without explicit justification.
-- [ ] #1 principles respected: Delta untouched by pagination, no content loss, no Quill core changes, no character-count pagination.
-- [ ] Strict TypeScript clean: no `any`, no floating promises, handled errors.
-- [ ] Modern Angular: no `standalone: true`, `OnPush` on new components, signals, native control flow, lazy routes.
-- [ ] Accessible markup; user content treated as untrusted; no secrets.
-- [ ] `npm run lint` and `npm run build` pass (or honestly reported as not run).
-- [ ] `MEMORY.md` actualizado si hubo cambios de estado, decisiones o errores que evitar (≤50 líneas).
-- [ ] Response follows the #5 format (abbreviated for trivial changes).
+---
+
+ ## 16\. Validation Commands
+
+ Use only commands that actually exist in `package.json`.
+
+ ### Lint
+
+```
+npm run lint
+```
+
+ ### Lint with automatic fixes
+
+```
+npm run lint:fix
+```
+
+ ### Production build
+
+```
+npm run build
+```
+
+ ### Tests
+
+```
+npm test
+```
+
+ ### Formatting check
+
+```
+npm run format:check
+```
+
+ ### Formatting
+
+```
+npm run format
+```
+
+ ### Minimum validation bar
+
+ For implementation changes:
+
+```
+npm run lint
+npm run build
+```
+
+ Run tests when:
+
+ - tested logic is modified;
+- the active spec requires tests;
+- pure domain logic is introduced;
+- pagination, geometry, Delta transformation, or content splitting behavior changes.
+
+ Never claim a command was executed unless it actually ran.
+
+ If validation cannot be executed, explicitly report that limitation.
+
+---
+
+ ## 17\. Decision Making
+
+ Resolve conflicts using this priority order:
+
+ 1. Security and correctness.
+2. Explicit user requirements.
+3. `docs/constitution.md`.
+4. Active `spec.md`.
+5. Active `plan.md`.
+6. Active `tasks.md`.
+7. Existing repository architecture and conventions.
+8. Current official Angular/TypeScript/Quill recommendations.
+9. Project configuration and tooling.
+10. Maintainability and scalability.
+11. Performance and accessibility where relevant.
+12. Personal stylistic preference.
+
+ ### Important distinction
+
+ The constitution and specs define **what the product must do**.
+
+ `AGENTS.md` defines **how the agent operates and implements it**.
+
+ Existing code defines **what currently exists**.
+
+ When these differ, do not blindly overwrite one with another. Determine whether the difference represents:
+
+ - intended future work;
+- incomplete implementation;
+- stale documentation;
+- an actual contradiction.
+
+ Report meaningful contradictions rather than hiding them.
+
+ Consult official documentation when APIs are uncertain or may have changed:
+
+ - [Angular](<https://angular.dev/>)
+- [TypeScript](<https://www.typescriptlang.org/>)
+- [Quill](<https://quilljs.com/>)
+
+ Prefer official documentation over blog posts and outdated Angular examples.
+
+---
+
+ ## 18\. Final Checklist
+
+ Before finishing any implementation task:
+
+ ### Scope
+
+ - [ ] Only the requested/current spec was implemented.
+- [ ] No future spec was silently implemented.
+- [ ] No unrelated refactors were introduced.
+- [ ] No unnecessary dependency/configuration changes were made.
+
+ ### Requirements
+
+ - [ ] `docs/constitution.md` was considered.
+- [ ] Active `spec.md` was read.
+- [ ] Active `plan.md` was read.
+- [ ] Active `tasks.md` was read.
+- [ ] Acceptance criteria are satisfied.
+- [ ] No known requirement conflict remains.
+
+ ### Architecture
+
+ - [ ] Delta remains the canonical document model.
+- [ ] Pagination does not mutate Delta.
+- [ ] No character-count pagination.
+- [ ] No Quill core modification.
+- [ ] No silent content loss.
+- [ ] Pagination and PDF concerns remain separated.
+
+ ### Code quality
+
+ - [ ] Strict TypeScript passes.
+- [ ] No `any`.
+- [ ] Promises are handled.
+- [ ] Angular conventions are respected.
+- [ ] New components use `OnPush`.
+- [ ] Signals are used appropriately.
+- [ ] Accessibility requirements are respected.
+- [ ] Security requirements are respected.
+
+ ### Validation
+
+ - [ ] `npm run lint` passes.
+- [ ] `npm run build` passes.
+- [ ] Relevant tests pass.
+- [ ] `npm run format:check` passes when formatting-sensitive changes were made.
+- [ ] Commands actually executed are accurately reported.
+
+ ### Spec state
+
+ - [ ] `tasks.md` reflects the actual implementation state.
+- [ ] No task is marked complete without verification.
+- [ ] Remaining work is clearly identified.
+- [ ] The agent did not automatically start the next spec.
+
+ ### Memory
+
+ - [ ] `MEMORY.md` was updated if project state, decisions, or pitfalls changed.
+- [ ] `MEMORY.md` remains concise (approximately ≤50 lines).
+- [ ] No secrets or sensitive information were added.
+
+ ### Final report
+
+ The final response should summarize:
+
+ 1. Requirement analysis.
+2. Technical approach.
+3. Files changed.
+4. Implementation completed.
+5. Validation commands and actual results.
+6. Remaining tasks.
+7. Risks or decisions requiring attention.
+8. Whether the current spec is complete or partial.
