@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 
-import { EditorComponent } from '../../../common/components/editor/editor';
+import { EditorComponent } from '../../../common/editor/editor';
 
 @Component({
   selector: 'app-home',

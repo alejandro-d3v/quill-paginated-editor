@@ -5,34 +5,31 @@ aporte. Las reglas permanentes viven en `AGENTS.md`, no aquí.
 
 ## Estado actual
 
-- **00-discovery COMPLETA** (2026-10-02): reporte en `docs/discovery.md` (11 secciones, REQ-01..07).
-- Editor de Quill implementado: `EditorComponent` en `common/components/editor/` (snow theme, toolbar completo, init en `ngAfterViewInit`). Aún **no expone Delta** (lo añade 01).
-- Línea base VERDE (2026-10-02): lint 0/0, tests 3/3, build 220.8 kB initial. Correcciones previas del usuario: `editor.spec.ts` (import), `app.spec.ts` (aserción h1 stale eliminada), `home.html` (self-closing) y skill `systematic-debugging` borrada (causaba el error de lint).
-- Warning de build conocido: `quill-delta` CommonJS → bailout de optimización; mitigación futura `allowedCommonJsDependencies` (requiere aprobación).
-- Sin modelo de documento, geometría, paginación, medición ni PDF; sin backend ni services.
+- **01-document-model COMPLETA** (2026-10-03): tipos + defaults + validación en `common/document/`; wrapper migrado a `common/editor/` (git mv, 4 renames) con `deltaChange: output<Delta>()` en cada `text-change` y `ngOnDestroy` real (desconecta listener, suelta referencia).
+- Suite verde: 13 tests / 4 archivos (7 document-settings, 4 editor con stub de Quill, 1 home con Quill real, 1 app). Lint 0/0, build 221.4 kB initial.
+- `AGENTS.md` sincronizado tras la migración (§1 estado, §3 árbol, §4 path del wrapper).
+- Warning de build preexistente: `quill-delta` CommonJS (mitigación futura `allowedCommonJsDependencies`, requiere aprobación).
+- Sin geometría, paginación, medición ni PDF: eso es 02+.
 
-## Decisiones (cerradas en 00-discovery — detalle en docs/discovery.md)
+## Decisiones (00-discovery en `docs/discovery.md` §3–§7; 01 aquí)
 
-- **A1 — editor continuo + overlay visual de páginas**: nunca se reestructura el DOM de Quill (RULE-015/020); 05 produce descriptores de corte, no división física.
-- **Seam de medición**: motor puro `paginate(measuredBlocks, geometry)` + `MeasurementService` (Angular, browser-only, lecturas agrupadas). jsdom no mide layout; sin este seam los tests del motor serían ciegos (RULE-006).
-- **Carpetas**: `common/{document,pagination,pdf,editor}`; el wrapper migra a `common/editor/` en 01; `app/` y `home/` no se mueven.
-- **PDF**: decisión diferida a 09 (criterios y candidatos en discovery §6); prohibido el snapshot de DOM (RULE-007/P-IV).
-- **Tablas**: fuera de 06; regla por defecto del motor: bloque desconocido = indivisible, nunca se pierde contenido (RULE-011).
+- **01 — `import type { Delta } from 'quill'`** (no `quill-delta`): quill 2.0.3 re-exporta el tipo desde su core y coincide con `getContents()`; `quill-delta` es dependencia transitiva (importarlo exigiría tocar `package.json`).
+- **01 — `isValidDocumentSettings(settings: unknown): boolean`**: los valores inválidos solo existen fuera del sistema de tipos (futuras UI/deserialización); con param `unknown` los tests negativos no necesitan casts ni `any`. Validación estructural only; la geométrica pertenece a 02.
+- **01 — Defaults**: A4 portrait, márgenes 25 mm, header/footer `enabled: false` con `height: 10` mm (REQ-02 de la spec).
+- **01 — Stub de Quill en `editor.spec.ts`** (`vi.hoisted` + `vi.mock('quill')`): jsdom no cubre las APIs de selección; el Quill real queda cubierto por `home.spec.ts`.
 
 ## Aprendizajes y errores a evitar
 
-- El toolbar ya produce listas/imágenes/blockquotes/code-blocks: 04 necesita la regla indivisible desde el día uno.
-- Skills citan secciones de AGENTS.md por número desfasado (renumbering `fd35e32`): guiarse por NOMBRE de sección (listado en discovery §8, sin corregir).
-- Alias `@common` NO resuelve (sin `paths` en tsconfig): usar imports relativos.
-- ESLint excluye `*.spec.ts`: la calidad de los specs es responsabilidad manual.
-- Código nuevo: `viewChild()`/`input()`/`output()` + OnPush, sin `standalone: true`; Quill solo tras la vista.
+- `simple-import-sort` también ordena especificadores nombrados: correr `npm run lint:fix` tras crear archivos; lint falla si no.
+- `vi.hoisted` + `vi.mock` funciona en el unit-test builder (@angular/build + vitest 4) sin tocar la implementación.
+- Alias `@common` sigue sin resolver: imports relativos.
+- Skills aún citan `common/components/editor` y numeración desfasada de AGENTS.md: corregir solo con aprobación (listado en discovery §8).
 
 ## Próximos pasos
 
-- Implementar **01-document-model** (siguiente spec; una a la vez).
-- En el plan de 01: exposición de Delta por el wrapper (`output()`/signal en `text-change`), migración `common/components/editor/` → `common/editor/`, y ratificar nombre de clase (`EditorComponent` vs AGENTS.md §3 sin sufijo — el usuario mantuvo el sufijo).
+- Implementar **02-page-geometry** (siguiente spec; una a la vez): UnitConverter (mm↔px @96dpi) + PageGeometry; extender la validación con sanidad geométrica (márgenes vs. dimensiones de página).
 
 ## Pendientes / dudas abiertas
 
-- Tecnología PDF (09) · tablas 06b o descope · virtualización de páginas (10) · widows/orphans (05) · render de header/footer: tokens vs Delta (08).
-- Corregir referencias cruzadas de skills (discovery §8) y ubicar/eliminar `temp/pagination-spec/` — requieren aprobación del usuario.
+- PDF (09) · tablas 06b · virtualización de páginas (10) · widows/orphans (05) · render de header/footer: tokens vs Delta (08).
+- Corregir referencias cruzadas de skills y ubicar/eliminar `temp/pagination-spec/` — requieren aprobación del usuario.

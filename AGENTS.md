@@ -54,7 +54,7 @@ This is the operational manual for AI coding agents working in this repository. 
 ## 1\. Repository Overview
 
 - **Product**: A paginated document editor built on top of [Quill 2.x](<https://quilljs.com/>) — content is displayed as physical pages (A4/Letter/Legal, orientation, margins, headers/footers, page numbers, page breaks) instead of one continuous editor.
-- **Status**: Experimental MVP under active development. The app is a root shell with lazy routing plus a `home` feature page hosting the Quill wrapper (`common/components/editor`). The wrapper **is implemented** (`EditorComponent`: snow theme, full toolbar, Quill instantiated in `ngAfterViewInit`) but **does not expose Delta yet** (no `text-change` wiring, no `output()`/signal). Known wrapper debt (redundant `standalone: true`, empty `imports`, no `OnPush`, `@ViewChild`, fake `ngOnDestroy` cleanup, no ARIA, `::ng-deep`) — touch only what the current spec requires (RULE-019); details in `docs/discovery.md` §1.3. No document model, geometry, pagination, measurement, or PDF exists yet. Expect significant API/architecture churn; consult `README.md` and the active spec before large changes.
+- **Status**: Experimental MVP under active development. The app is a root shell with lazy routing plus a `home` feature page hosting the Quill wrapper (`common/editor`, migrated in spec 01). The wrapper **is implemented** (`EditorComponent`: snow theme, full toolbar, Quill instantiated in `ngAfterViewInit`) and **exposes the canonical Delta via `deltaChange: output<Delta>()` on every `text-change`**; `ngOnDestroy` disconnects the listener. Known wrapper debt (redundant `standalone: true`, empty `imports`, no `OnPush`, `@ViewChild`, no ARIA, `::ng-deep`) — touch only what the current spec requires (RULE-019); those belong to `03-visual-pages`. Domain vocabulary (types, defaults, validation) lives under `common/document/`. No geometry, pagination, measurement, or PDF exists yet. Expect significant API/architecture churn; consult `README.md` and the active spec before large changes.
 
 ### Non-negotiable product principles
 
@@ -103,7 +103,8 @@ src/
     ├── app.config.ts
     ├── app.routes.ts
     ├── common/
-    │   └── components/editor/
+    │   ├── document/
+    │   └── editor/
     └── home/
         ├── home.routes.ts
         └── pages/home/
@@ -167,7 +168,7 @@ Pagination Engine
 Paginated View   PDF Renderer
 ```
 
-- Quill integration lives behind an Angular wrapper component (`common/components/editor`).
+- Quill integration lives behind an Angular wrapper component (`common/editor`).
 - The rest of the application interacts with the editor through `input()`/`output()` and signals.
 - Pagination logic belongs in standalone services, decoupled from the editor component and rendering.
 - Delta is the canonical model.
