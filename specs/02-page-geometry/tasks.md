@@ -2,41 +2,60 @@
 
 ## Preparation
 
-- [ ] Read `docs/constitution.md`.
-- [ ] Read `spec.md`.
-- [ ] Read `plan.md`.
-- [ ] Inspect the existing implementation before modifying it.
-- [ ] Identify dependencies on preceding specs.
+- [ ] Leer `docs/constitution.md` §3.3–§3.4, §7.1, §13 y Principle VI
+      (RULE-005, RULE-006, RULE-009, RULE-017, RULE-018).
+- [ ] Leer `docs/discovery.md` §4 (seam de medición) y §5 (estructura de
+      carpetas).
+- [ ] Leer `spec.md` y `plan.md` de esta spec.
+- [ ] Leer en `AGENTS.md` las secciones "Development Workflow",
+      "Spec-Driven Development", "Validation Commands" y "Final Checklist"
+      (por nombre; la numeración de secciones cambia).
+- [ ] Leer `MEMORY.md`.
+- [ ] Confirmar línea base verde (`npm run lint`, `npm test`,
+      `npm run build`) antes de empezar.
+- [ ] Confirmar la dependencia de 01: `src/app/common/document/document-settings.ts`
+      existe y exporta `DocumentSettings`, `PageSettings`, `PageMargins`,
+      `HeaderSettings`, `FooterSettings`, `DEFAULT_DOCUMENT_SETTINGS`.
 
-## Implementation
+## Implementation (REQ-01..REQ-04)
 
-- [ ] A4, Letter y Legal.
-- [ ] Portrait y landscape.
-- [ ] Márgenes.
-- [ ] Área de contenido, header y footer.
-- [ ] Conversión consistente de unidades.
+- [ ] Crear `src/app/common/pagination/unit-converter.ts`:
+      `MM_PER_INCH`, `CSS_PX_PER_INCH`, `mmToPx`, `pxToMm`
+      (puras, totales, sin redondeo).
+- [ ] Crear `src/app/common/pagination/page-geometry.ts`: - `PAGE_DIMENSIONS_MM` (A4 210×297; LETTER 215.9×279.4;
+      LEGAL 215.9×355.6), - `PageDimensionsMm` + `pageDimensionsMm(settings)`
+      (landscape = swap de width/height), - `PageGeometry` + `computePageGeometry(settings)` (§7.1 en px;
+      header/footer deshabilitados aportan 0; sin redondeo), - `isValidPageGeometry(settings)` (márgenes que exceden la página o
+      área ≤ 0 → `false`).
+
+## Tests (REQ-05)
+
+- [ ] Crear `unit-converter.spec.ts`: - `mmToPx(25.4) ≈ 96` y `pxToMm(96) ≈ 25.4` (`toBeCloseTo` ≥ 6), - Letter: `mmToPx(215.9) ≈ 816`, `mmToPx(279.4) ≈ 1056`, - roundtrip `pxToMm(mmToPx(x)) ≈ x`, - `mmToPx(0) === 0`.
+- [ ] Crear `page-geometry.spec.ts`: - dimensiones exactas 3 tamaños × portrait/landscape, - §7.1 con header/footer disabled (aportan 0) y enabled, - origen del área de contenido (`marginLeft`; `marginTop + headerHeight`), - márgenes cero, - `isValidPageGeometry`: defaults → `true`; márgenes que exceden
+      página → `false`; área ≤ 0 → `false`.
+- [ ] Confirmar que los valores esperados se calculan de forma independiente
+      (física conocida), no re-ejecutando las funciones bajo test.
+- [ ] Ejecutar `npm test`.
 
 ## Integration
 
-- [ ] Preserve Quill Delta as the canonical content.
-- [ ] Preserve existing editor behavior.
-- [ ] Avoid unnecessary Quill internal changes.
-- [ ] Keep TypeScript strict.
-- [ ] Verify interactions with dependent specs.
-
-## Tests
-
-- [ ] Add unit tests for core rules.
-- [ ] Add integration tests where Angular/Quill boundaries matter.
-- [ ] Add regression coverage.
-- [ ] Verify deterministic behavior.
-- [ ] Verify no content is lost.
-- [ ] Run relevant tests.
-- [ ] Run the Angular/TypeScript build.
+- [ ] Confirmar que `common/pagination/` no importa Angular ni DOM
+      (RULE-006): solo tipos de `common/document/`.
+- [ ] Confirmar que no se tocó `common/document/`, el wrapper del editor,
+      ni configuración (`eslint.config.mjs`, `tsconfig*.json`, `angular.json`,
+      `package.json`).
+- [ ] Confirmar determinismo por re-ejecución de la suite: mismas entradas →
+      mismos resultados (RULE-005).
 
 ## Review
 
-- [ ] Confirm no second source of truth was introduced.
-- [ ] Confirm performance implications are understood.
-- [ ] Confirm `spec.md` acceptance criteria are satisfied.
-- [ ] Document deviations or unresolved decisions.
+- [ ] `npm run lint` → PASS.
+- [ ] `npm test` → PASS.
+- [ ] `npm run build` → PASS.
+- [ ] `npx prettier --write` sobre los archivos creados (no repo-wide:
+      `format:check` repo-wide ya falla por archivos preexistentes fuera
+      de scope).
+- [ ] `tasks.md` refleja el estado real.
+- [ ] `MEMORY.md` actualizado (≤ 50 líneas).
+- [ ] Reportar archivos modificados, comandos ejecutados y resultado.
+- [ ] NO iniciar `03-visual-pages`.
