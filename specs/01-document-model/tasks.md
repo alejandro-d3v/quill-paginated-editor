@@ -69,6 +69,8 @@
 - [ ] Confirmar que todos los specs compilan bajo `strict` y sin `any`.
 - [ ] Ejecutar `npm test`.
 
+Nota: los tests negativos de REQ-02 requieren casts deliberados (`'A9' as never`, `as unknown as DocumentSettings`). Nunca `any` (RULE-018 aplica aunque ESLint excluya `*.spec.ts`).
+
 ## Integration
 
 - [ ] Confirmar que el Delta no se muta en ningún punto (RULE-003).
@@ -88,3 +90,6 @@
       `package.json`.
 - [ ] Reportar archivos modificados, comandos ejecutados y resultado.
 - [ ] NO iniciar `02-page-geometry`.
+- [ ] Formatear los archivos creados/movidos con `npx prettier --write` sobre 
+      las rutas afectadas (no ejecutar `format:check` repo-wide: ya falla por 
+      archivos preexistentes fuera de scope).

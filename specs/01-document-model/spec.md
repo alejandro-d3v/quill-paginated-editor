@@ -63,8 +63,10 @@ Bajo `src/app/common/document/` MUST existir:
 Los tipos MUST coincidir con `constitution.md` §3 y ser inmutables por
 defecto (`readonly` donde aplique).
 
-El tipo `Delta` MUST importarse de `quill-delta` (o equivalente Quill 2.x),
-nunca declarado localmente.
+El tipo `Delta` MUST importarse desde `quill` (`import type { Delta } from 'quill'` — Quill 2.0.3 
+lo re-exporta desde su core y coincide con el tipo de retorno de `getContents()`), nunca declarado localmente. 
+Importar directamente de `quill-delta` exigiría declararlo en `package.json` (hoy es transitivo) y queda 
+fuera de esta spec.
 
 ### REQ-02 — Defaults y validación
 
@@ -72,7 +74,7 @@ MUST existir un objeto de defaults `DEFAULT_DOCUMENT_SETTINGS` válido:
 
 - `page`: A4, portrait.
 - `margins`: valores razonables en mm (p. ej. 25 mm en los cuatro lados).
-- `header` / `footer`: `enabled: false`, altura mínima definida.
+- `header` / `footer`: `enabled: false`, `height: 10` (mm) cada uno.
 
 MUST existir una función `isValidDocumentSettings(settings): boolean` (o
 equivalente con discriminante de error) que rechace:
@@ -81,6 +83,10 @@ equivalente con discriminante de error) que rechace:
 - orientaciones fuera del union literal,
 - márgenes negativos o no finitos,
 - alturas de header/footer negativas.
+
+La validación es **estructural** (literales, signos, finitud). La sanidad geométrica 
+(márgenes que exceden las dimensiones de página, área útil ≤ 0) pertenece a `02-page-geometry` 
+y MUST NOT implementarse aquí.
 
 ### REQ-03 — Migración del wrapper
 
@@ -108,6 +114,9 @@ Angular:
 
 No se expone ningún otro estado (selection, cursor, etc.) en esta spec.
 
+Nota: la emisión en cada `text-change` es intencional en esta spec. El scheduling/debounce pertenece 
+a `04`/`10`; no introducir RxJS ni dependencias adicionales aquí.
+
 ### REQ-05 — Limpieza correcta
 
 `ngOnDestroy` MUST desconectar la suscripción a `text-change` antes de
@@ -121,8 +130,8 @@ desmontar el DOM; el foco es no dejar listeners colgando.
 
 - Unit puros: `DEFAULT_DOCUMENT_SETTINGS` cumple la validación; la
   validación rechaza cada caso inválido de REQ-02.
-- Unit puros: los tipos no permiten `any`; los tests de TypeScript
-  compilan bajo `strict`.
+- Verificación de compilación (no test unitario): el código nuevo compila 
+  bajo `strict` sin `any`; se confirma vía `npm run lint` y `npm run build`.
 - Componente: `EditorComponent` emite `deltaChange` tras un cambio de
   contenido en Quill. Se permite stubear Quill para evitar depender del
   DOM real en jsdom (patrón sugerido por la skill `quill-wrapper`).
