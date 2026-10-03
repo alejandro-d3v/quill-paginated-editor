@@ -36,6 +36,7 @@
 - [ ] Confirmar que los valores esperados se calculan de forma independiente
       (física conocida), no re-ejecutando las funciones bajo test.
 - [ ] Ejecutar `npm test`.
+- [ ] Las dimensiones ISO/US usadas en los tests MUST estar hardcodeadas en el propio test (210, 297, 215.9, 279.4, 355.6), **no** importadas de `PAGE_DIMENSIONS_MM` (evita tautología).
 
 ## Integration
 

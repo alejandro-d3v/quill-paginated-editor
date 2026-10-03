@@ -119,6 +119,10 @@ Debe devolver `true` para `DEFAULT_DOCUMENT_SETTINGS`. Es la pieza que
 `01-document-model` REQ-02 diferió explícitamente a esta spec. No reemplaza
 al validador estructural de 01: lo complementa.
 
+Implementación: derivar el veredicto del resultado de `computePageGeometry` 
+(`contentWidthPx > 0 && contentHeightPx > 0`); las sumas listadas son la 
+justificación, no una fórmula paralela
+
 ### REQ-05 — Tests del catálogo §13 (Page Geometry)
 
 Colocados junto al código, puros (vitest globals, sin TestBed), según
@@ -141,6 +145,10 @@ constitution §13:
 
 Los valores esperados se calculan de forma independiente (física conocida,
 aritmética mm por separado), no re-ejecutando la función bajo test.
+
+Todas las expectativas en **px** (incluidas las de la fórmula §7.1) MUST 
+usar `toBeCloseTo` con precisión ≥ 6. Las expectativas en **mm** (tabla de 
+dimensiones) MUST usar `toBe` con literales idénticos a `PAGE_DIMENSIONS_MM`.
 
 ### REQ-06 — NO avanzar a specs posteriores
 
@@ -171,9 +179,10 @@ Esta spec MUST NOT:
 - No se introdujo medición, paginación, render, UI ni dependencias.
 - No se tocó `common/document/`, `eslint.config.mjs`, `tsconfig*.json`,
   `angular.json` ni `package.json`.
-- Determinismo verificable por re-ejecución de la suite: mismas entradas →
-  mismos resultados (aritmética IEEE-754, sin redondeos dependientes del
-  entorno).
+- Determinista por construcción: sin fuentes no deterministas (`Date`,
+  `Math.random`, DOM, `locale`) en `src/app/common/pagination/` —
+  verificable por inspección del diff; la suite asierta valores exactos en
+  cada ejecución.
 
 ## Out of scope
 
