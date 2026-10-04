@@ -54,6 +54,10 @@
       `computePageGeometry(DEFAULT_DOCUMENT_SETTINGS)`; bandas ausentes con
       los defaults y presentes con alturas correctas con settings que las
       habilitan; padding de márgenes y ancho del área de contenido.
+- [ ] En las aserciones de styles (page-frame y home): parsear el valor
+      (`parseFloat`) y comparar con `toBeCloseTo` ≥ 6, o computar el
+      esperado con la expresión idéntica `(mm * 96) / 25.4` — nunca
+      comparar strings de floats de expresiones distintas.
 - [ ] Crear `pages-container.spec.ts`: creación y proyección de contenido.
 - [ ] Extender `home.spec.ts`: `app-pages-container` > `app-page-frame` >
       `app-editor` anidados; el marco recibe la geometría (style width
@@ -71,6 +75,8 @@
       servicios de paginación (solo `PageGeometry` de 02).
 - [ ] Confirmar presupuesto de estilos por componente (< 4 kB warn,
       `angular.json`).
+- [ ] Confirmar por grep (AC-5): sin `::ng-deep` en `editor.scss` y
+      overrides `.ql-` presentes en `src/styles.scss`.
 - [ ] Confirmar que no se tocó `common/document/` ni `common/pagination/`
       (salvo imports de tipos), ni config (`eslint.config.mjs`,
       `tsconfig*.json`, `angular.json`, `package.json`).
@@ -88,5 +94,9 @@
       de scope).
 - [ ] `tasks.md` refleja el estado real.
 - [ ] `MEMORY.md` actualizado (≤ 50 líneas).
+- [ ] Sincronizar `AGENTS.md` (secciones por nombre): en "Repository
+      Overview", la deuda del wrapper queda resuelta por REQ-04 y el
+      estado gana el caparazón visual; en "Repository Structure", el árbol
+      gana `common/components/`.
 - [ ] Reportar archivos modificados, comandos ejecutados y resultado.
 - [ ] NO iniciar `04-pagination-mvp`.

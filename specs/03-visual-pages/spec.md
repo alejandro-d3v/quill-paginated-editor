@@ -80,6 +80,10 @@ Bajo `src/app/common/components/page-frame/` MUST existir el componente
     solo con `@if (… > 0)`;
   - área de contenido con `width` = `contentWidthPx` y `<ng-content />`.
 
+Orden del flujo en la plantilla: banda de header → área de contenido
+(`<ng-content />`) → banda de footer, consistente con `contentYPx` de la
+spec 02 (`marginTopPx + headerHeightPx`, constitution §7.1).
+
 Comportamiento continuo pre-paginación (documentado; la spec 04 lo
 sustituirá con páginas reales e indicadores): el marco crece con el
 contenido más allá de `min-height` y la banda de footer queda al final del
@@ -155,6 +159,12 @@ computa layout → se asertan style bindings inline, no
 - `editor.spec.ts` (extender): el contenedor del editor expone
   `role="textbox"`, `aria-label` y `aria-multiline`; los tests existentes
   de `deltaChange` y cleanup siguen pasando sin cambios de semántica.
+
+Aserciones de styles: los valores son floats (p. ej.
+`793.7007874015748px`); parsear el número (`parseFloat`) y comparar con
+`toBeCloseTo` (precisión ≥ 6), o computar el esperado con la expresión
+idéntica `(mm * 96) / 25.4` — nunca comparar strings de floats producidos
+por expresiones distintas.
 
 ### REQ-06 — NO avanzar a specs posteriores
 
