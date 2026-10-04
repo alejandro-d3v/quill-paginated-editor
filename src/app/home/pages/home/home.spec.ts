@@ -45,4 +45,13 @@ describe('Home', () => {
       expect(parseFloat(page.style.width)).toBeCloseTo(toPx(210), 6);
     }
   });
+
+  it('renderiza los indicadores de salto dentro del marco (spec 04)', () => {
+    const native: HTMLElement = fixture.nativeElement;
+    const frame = native.querySelector<HTMLElement>('app-page-frame');
+    if (frame === null) {
+      throw new Error('no se encontró app-page-frame');
+    }
+    expect(frame.querySelector('app-page-break-indicators')).not.toBeNull();
+  });
 });

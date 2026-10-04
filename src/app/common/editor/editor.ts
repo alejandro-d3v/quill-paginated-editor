@@ -17,7 +17,12 @@ import Quill, { type Delta } from 'quill';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class EditorComponent implements AfterViewInit, OnDestroy {
-  private readonly editorElement = viewChild.required<ElementRef<HTMLDivElement>>('editor');
+  /**
+   * Superficie de medición (A1, spec 04 REQ-05): el contenedor del editor.
+   * Expone el ELEMENTO, nunca la instancia de Quill (skill `quill-wrapper`);
+   * la paginación lee el DOM renderizado dentro de él.
+   */
+  readonly editorElement = viewChild.required<ElementRef<HTMLDivElement>>('editor');
   private quill: Quill | null = null;
   readonly deltaChange = output<Delta>();
 

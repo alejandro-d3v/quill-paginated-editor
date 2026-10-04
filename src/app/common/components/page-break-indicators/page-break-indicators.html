@@ -1,0 +1,5 @@
+<div class="breaks" aria-hidden="true">
+  @for (offset of boundaries(); track $index) {
+    <div class="break" [style.top.px]="offset" [style.width.px]="geometry().contentWidthPx"></div>
+  }
+</div>

@@ -1,0 +1,17 @@
+:host {
+  position: absolute;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+}
+
+.breaks {
+  position: absolute;
+  inset: 0;
+}
+
+.break {
+  position: absolute;
+  left: 0;
+  border-top: 1px dashed #b0b0b0;
+}

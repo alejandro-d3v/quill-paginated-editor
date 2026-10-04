@@ -1,14 +1,28 @@
-import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 
+import type { Delta } from 'quill';
+
+import { PageBreakIndicators } from '../../../common/components/page-break-indicators/page-break-indicators';
 import { PageFrame } from '../../../common/components/page-frame/page-frame';
 import { PagesContainer } from '../../../common/components/pages-container/pages-container';
 import { DEFAULT_DOCUMENT_SETTINGS } from '../../../common/document/document-settings';
 import { EditorComponent } from '../../../common/editor/editor';
+import { extractBlocks } from '../../../common/pagination/extract-blocks';
+import { MeasurementService } from '../../../common/pagination/measurement';
 import { computePageGeometry } from '../../../common/pagination/page-geometry';
+import { type LayoutDocument,paginate } from '../../../common/pagination/paginate';
 
 @Component({
   selector: 'app-home',
-  imports: [EditorComponent, PageFrame, PagesContainer],
+  imports: [EditorComponent, PageBreakIndicators, PageFrame, PagesContainer],
   templateUrl: './home.html',
   styleUrl: './home.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -16,4 +30,35 @@ import { computePageGeometry } from '../../../common/pagination/page-geometry';
 export class Home {
   protected readonly settings = signal(DEFAULT_DOCUMENT_SETTINGS);
   protected readonly geometry = computed(() => computePageGeometry(this.settings()));
+  protected readonly content = signal<Delta | null>(null);
+  protected readonly layout = signal<LayoutDocument | null>(null);
+
+  private readonly editorHost = viewChild(EditorComponent);
+  private readonly measurement = inject(MeasurementService);
+
+  constructor() {
+    // Pipeline del seam (discovery §4, spec 04 REQ-05). Recomputación
+    // coalescida (constitution §11, MVP): el effect se ejecuta una vez por
+    // lote de cambios con el último estado. Flujo unidireccional — el
+    // pipeline jamás escribe `content` ni `settings` (guarda de bucle
+    // zoneless, discovery §10 #4) — y el DOM del editor solo se lee
+    // (A1, RULE-015).
+    effect(() => {
+      const content = this.content();
+      const geometry = this.geometry();
+      if (content === null) {
+        this.layout.set(null);
+        return;
+      }
+      const host = this.editorHost();
+      const container = host?.editorElement().nativeElement;
+      if (container === undefined) {
+        this.layout.set(null);
+        return;
+      }
+      const blocks = extractBlocks(content);
+      const measured = this.measurement.measure(blocks, container);
+      this.layout.set(paginate(measured, geometry));
+    });
+  }
 }

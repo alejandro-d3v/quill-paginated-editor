@@ -5,34 +5,36 @@ aporte. Las reglas permanentes viven en `AGENTS.md`, no aquí.
 
 ## Estado actual
 
-- **03-visual-pages COMPLETA** (2026-10-04): `common/components/` con `PageFrame` (geometría de 02 por `input.required`, bandas reservadas condicionales, flujo header→contenido→footer) + `PagesContainer` (canvas). `home` compone canvas → marco → editor con `settings` signal + `geometry` computed (OnPush).
-- Wrapper alineado a convenciones (OnPush, `viewChild.required` signal, ARIA en `#editor`, sin `standalone: true`/`imports: []`/`::ng-deep`); overrides `.ql-*` reubicados en `styles.scss` (declaraciones byte-idénticas). Deuda de 01 REQ-07: **resuelta**.
-- Pre-paginación (A1): una sola página continua (`min-height` = página); footer fluye al final del contenido; indicadores → 04.
-- Suite verde: 40 tests / 8 archivos. Lint 0/0; build 231.4 kB initial (+9.9 kB por el caparazón). Warning preexistente `quill-delta` CommonJS.
-- `AGENTS.md` sincronizado (§1 estado, §3 árbol).
+- **04-pagination-mvp COMPLETA** (2026-10-04): el motor existe. `common/pagination/` gana `block.ts`, `extract-blocks.ts`, `paginate.ts` (puros) y `measurement.ts` (`MeasurementService`, browser-only). `home` cablea el seam con `effect()` coalescido; `PageBreakIndicators` dibuja los cortes sobre el marco.
+- Pipeline: `deltaChange` → `extractBlocks` → `measure(blocks, editorElement())` → `paginate(measured, geometry())` → `layout` → overlay. Bloques atómicos (regla indivisible, discovery §7).
+- Suite verde: 72 tests / 12 archivos (+32 del motor: 9 paginate, 11 extract, 5 measurement, 4 indicators, 1 home, +2 ajustes). Lint 0/0; build 240.2 kB initial (+8.8 kB).
+- Wrapper: `editorElement` viewChild readonly público = superficie de medición (la instancia de Quill sigue encapsulada).
+- Warning de build preexistente: `quill-delta` CommonJS. `AGENTS.md` sincronizado (§1 estado).
+- Aún sin splitting (05), clasificación/imágenes async (06), breaks (07), bandas (08), PDF (09), incremental (10).
 
-## Decisiones (00-discovery en `docs/discovery.md`; 01–03 aquí)
+## Decisiones (00-discovery en `docs/discovery.md`; 01–04 aquí)
 
-- **03 — orden de flujo del marco**: header → contenido → footer, anclado a `contentYPx` de 02 (§7.1); bandas vacías (contenido de bandas es de 08).
-- **03 — overrides `.ql-*` globales** en `styles.scss`: Snow ya es global y solo existe un editor → mismo resultado visual sin `::ng-deep`.
-- **03 — ARIA a nivel de contenedor** `#editor` (patrón skill `quill-wrapper`): `role="textbox"`, `aria-label`, `aria-multiline`. AXE manual queda como revisión humana (no hay tooling; RULE-017).
-- **02/03 — aserciones de styles en jsdom**: `parseFloat` + `toBeCloseTo ≥ 6` con `toPx` independiente; nunca strings de floats.
-- **01** — `import type { Delta } from 'quill'`; validador estructural sobre `unknown`; wrapper en `common/editor/` con `deltaChange`.
+- **04 — seam**: `paginate(measuredBlocks, geometry)` puro + `MeasurementService.measure(blocks, editorContainer)`; ids canónicos desde `extractBlocks`; desalineo de conteo → `Error` (fail-fast browser-side — silenciar colocaría contenido en páginas erróneas).
+- **04 — altura de flujo**: `heightPx` = diferencia de offsets entre bloques contiguos (último: rect + margin inferior) — un rect desnudo ignora márgenes y desfasa motor y overlay (Principle V).
+- **04 — segmentación alineada con Quill**: embeds inline acumulan en su línea (image es inline); runs de listas del mismo tipo = un bloque; el Delta de documento es insert-only.
+- **04 — recomputación coalescida** vía `effect()`: una ejecución por lote con el último estado; flujo unidireccional (el pipeline jamás escribe `content`/`settings`). Debouncing/incremental → 10.
+- **01–03** — Delta desde `'quill'`; validadores estructural (01) y geométrico (02) separados; caparazón visual A1 con `PageFrame`/`PagesContainer`.
 
 ## Aprendizajes y errores a evitar
 
-- `ComponentFixture.nativeElement` está tipado `any`: los genéricos `querySelector<HTMLElement>` sobre él fallan con TS2347 — asignar primero `const native: HTMLElement = fixture.nativeElement`.
-- `input.required` en TestBed: `fixture.componentRef.setInput(...)` ANTES del primer `whenStable()`.
-- Sub-bullets `-` anidados dentro de ítems `- [ ]` rompen la idempotencia de Prettier en tasks.md — usar prosa.
-- En tests de lógica matemática: fórmula esperada inline, nunca importar la función bajo test; `toBeCloseTo ≥ 6` para px.
-- Alias `@common` no resuelve: imports relativos. Skills citan secciones AGENTS.md por número desfasado: por nombre.
+- TS no rastrea mutaciones en closures: tras un loop que muta vía closure, la variable queda falsamente estrechada — pasarla como parámetro a un helper (o reestructurar) para el chequeo final.
+- `restrict-template-expressions`: números en template literals requieren `String()`.
+- Quill renderiza images INLINE (dentro del `<p>`): la extracción debe acumularlas en su línea, nunca partirlas en bloque propio.
+- `parseFloat(getComputedStyle(...)) || 0`: jsdom devuelve márgenes vacíos — el `|| 0` es necesario.
+- Tests DOM: `const native: HTMLElement = fixture.nativeElement` (está tipado `any`); `input.required` necesita `setInput` antes del primer `whenStable()`.
+- Alias `@common` no resuelve; sub-bullets anidados rompen Prettier en tasks.md; skills citan secciones AGENTS.md desfasadas (por nombre).
 
 ## Próximos pasos
 
-- **Redactar `04-pagination-mvp`** (plantilla → `/spec-write`; luego review + feature). Es el núcleo: consume `deltaChange` + `computePageGeometry`; define `MeasuredBlock`/`extractBlocks`/`MeasurementService` (seam, discovery §4), `paginate` puro, `LayoutDocument` e indicadores de salto; la invariants suite nace ahí.
+- **Revisión manual humana en navegador** (pendiente de 04): pipeline end-to-end con texto real, indicadores en los cortes, AXE.
+- Luego: `/spec-write 05-content-splitting` (plantilla) → review → feature. Habilita `splittable: true` para párrafos (constitution §7.3), `minFragmentHeightPx`, descriptores de corte en `LayoutDocument`.
 
 ## Pendientes / dudas abiertas
 
 - PDF (09) · tablas 06b · virtualización (10) · widows/orphans (05) · render de header/footer: tokens vs Delta (08).
-- Revisión manual humana en navegador de 03 (apariencia + AXE) — recomendada, no bloqueante.
-- Corregir referencias cruzadas de skills y ubicar/eliminar `temp/pagination-spec/` — requieren aprobación.
+- Corregir referencias cruzadas de skills y ubicar/eliminar `temp/pagination-spec/` — requieren aprobación del usuario.

@@ -1,5 +1,6 @@
 <app-pages-container>
   <app-page-frame [geometry]="geometry()">
-    <app-editor />
+    <app-page-break-indicators [layout]="layout()" [geometry]="geometry()" />
+    <app-editor (deltaChange)="content.set($event)" />
   </app-page-frame>
 </app-pages-container>
