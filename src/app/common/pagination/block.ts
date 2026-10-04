@@ -11,6 +11,14 @@ import type { Op } from 'quill';
  */
 export type BlockId = number;
 
+/**
+ * Clasificación por tipo (spec 06, REQ-01; discovery §4 sanciona la
+ * extensión "tipo de bloque"). Derivada de los atributos del op
+ * terminador; `align`/`indent` y los formatos inline NO cambian el tipo.
+ * El motor no consume tipos: la unidad de corte la fija la medición.
+ */
+export type BlockKind = 'paragraph' | 'heading' | 'list' | 'blockquote' | 'code-block';
+
 /** Fragmento del Delta que representa un bloque; formatos inline preservados en `ops`. */
 export interface Block {
   readonly id: BlockId;

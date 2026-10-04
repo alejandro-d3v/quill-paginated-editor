@@ -1,7 +1,7 @@
 import type { Delta, Op } from 'quill';
 
-import type { Block } from './block';
-import { extractBlocks, isSplittableBlock } from './extract-blocks';
+import type { Block, BlockKind } from './block';
+import { blockKind, extractBlocks, isSplittableBlock } from './extract-blocks';
 
 /** Fixture: Delta de documento a partir de ops literales. */
 const doc = (ops: readonly Op[]): Delta => ({ ops: [...ops] }) as unknown as Delta;
@@ -141,25 +141,79 @@ describe('isSplittableBlock (spec 05, REQ-02)', () => {
     );
   });
 
-  it('run de lista → indivisible', () => {
+  it('run de lista → divisible (update declarado por 06, REQ-02)', () => {
     expect(isSplittableBlock(blockOf([{ insert: 'a\n', attributes: { list: 'bullet' } }]))).toBe(
-      false
+      true
     );
   });
 
-  it('blockquote → indivisible', () => {
+  it('blockquote → divisible (update declarado por 06, REQ-02)', () => {
     expect(
       isSplittableBlock(blockOf([{ insert: 'cita\n', attributes: { blockquote: true } }]))
-    ).toBe(false);
+    ).toBe(true);
   });
 
-  it('code-block → indivisible', () => {
+  it('code-block → divisible (update declarado por 06, REQ-02)', () => {
     expect(
       isSplittableBlock(blockOf([{ insert: 'const x = 1;\n', attributes: { 'code-block': true } }]))
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('sin op terminador (defensivo) → indivisible', () => {
     expect(isSplittableBlock(blockOf([{ insert: 'sin salto' }]))).toBe(false);
+  });
+});
+
+describe('blockKind (spec 06, REQ-01)', () => {
+  const blockOf = (ops: readonly Op[]): Block => ({ id: 0, ops });
+
+  it('párrafo puro → paragraph', () => {
+    expect(blockKind(blockOf([{ insert: 'hola mundo\n' }]))).toBe('paragraph');
+  });
+
+  it('párrafo con inline y embed → paragraph', () => {
+    expect(
+      blockKind(
+        blockOf([
+          { insert: 'hola ', attributes: { bold: true } },
+          { insert: { image: 'x.png' } },
+          { insert: ' mundo\n' },
+        ])
+      )
+    ).toBe('paragraph');
+  });
+
+  it('header → heading', () => {
+    expect(blockKind(blockOf([{ insert: 'T\n', attributes: { header: 1 } }]))).toBe('heading');
+  });
+
+  it('list bullet → list', () => {
+    expect(blockKind(blockOf([{ insert: 'a\n', attributes: { list: 'bullet' } }]))).toBe('list');
+  });
+
+  it('list ordered → list', () => {
+    expect(blockKind(blockOf([{ insert: 'a\n', attributes: { list: 'ordered' } }]))).toBe('list');
+  });
+
+  it('blockquote → blockquote', () => {
+    expect(blockKind(blockOf([{ insert: 'cita\n', attributes: { blockquote: true } }]))).toBe(
+      'blockquote'
+    );
+  });
+
+  it('code-block → code-block', () => {
+    expect(
+      blockKind(blockOf([{ insert: 'const x = 1;\n', attributes: { 'code-block': true } }]))
+    ).toBe('code-block');
+  });
+
+  it('align/indent sin atributo de tipo → paragraph', () => {
+    expect(
+      blockKind(blockOf([{ insert: 'texto\n', attributes: { align: 'center', indent: 1 } }]))
+    ).toBe('paragraph');
+  });
+
+  it('sin op terminador (defensivo) → paragraph', () => {
+    expect(blockKind(blockOf([{ insert: 'sin salto' }]))).toBe('paragraph');
   });
 });

@@ -183,6 +183,26 @@ describe('paginate — corte de párrafos (§7.3, spec 05)', () => {
   });
 });
 
+describe('paginate — listas divisibles (spec 06, REQ-05)', () => {
+  it('corte exacto en frontera de ítem (unidades = flujos de <li>; el motor no distingue tipos)', () => {
+    // La medición de un bloque list produce unidades por <li> (spec 06,
+    // REQ-03): el motor las consume genéricamente — esta prueba fija que
+    // el corte cae SOLO entre unidades, nunca dentro.
+    const result = paginate([splittableBlock(0, [50, 20, 50])], geometry(100));
+    expect(result.pages.length).toBe(2);
+    expect(result.pages[0]!.blocks[0]).toEqual({
+      id: 0,
+      heightPx: 70,
+      lineRange: { from: 0, to: 2 },
+    });
+    expect(result.pages[1]!.blocks[0]).toEqual({
+      id: 0,
+      heightPx: 50,
+      lineRange: { from: 2, to: 3 },
+    });
+  });
+});
+
 describe('paginate — invariant de reconstrucción de líneas (RULE-011, spec 05)', () => {
   const fragmentsOf = (document: LayoutDocument, id: number): readonly LayoutBlock[] =>
     document.pages.flatMap((page) => page.blocks.filter((block) => block.id === id));
@@ -219,6 +239,7 @@ describe('paginate — invariant de reconstrucción de líneas (RULE-011, spec 0
       splittableBlock(2, [250, 30]),
       splittableBlock(3, [50, 50]),
       splittableBlock(4, [30, 40]),
+      splittableBlock(5, [50, 20, 50]), // lista divisible (spec 06)
     ];
     const result = paginate(fixtures, geometry(100));
     for (const block of fixtures) {

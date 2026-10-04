@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 
 import type { Block, MeasuredBlock } from './block';
-import { isSplittableBlock } from './extract-blocks';
+import { blockKind, isSplittableBlock } from './extract-blocks';
 
 /**
  * Capa browser-only del seam de medición (discovery §4; specs 04 y 05).
@@ -62,7 +62,7 @@ export class MeasurementService {
           ? rects[index + 1].top - rects[index].top
           : rects[index].height + lastMarginBottomPx;
       const splittable = isSplittableBlock(block);
-      const lineHeightsPx = splittable ? this.measureLines(children[index], heightPx) : [];
+      const lineHeightsPx = this.measureUnits(block, children[index], heightPx);
       const measured: MeasuredBlock = splittable
         ? {
             id: block.id,
@@ -74,6 +74,45 @@ export class MeasurementService {
         : { id: block.id, heightPx, splittable, lineHeightsPx };
       return measured;
     });
+  }
+
+  /**
+   * Unidades de corte por tipo (spec 06, REQ-03): bloques `list` miden
+   * flujos de `<li>` (corte SOLO en fronteras de ítem — la medición no
+   * emite unidades más finas); los divisibles de texto (paragraph,
+   * blockquote, code-block) miden líneas renderizadas (camino de 05);
+   * indivisibles (heading, entrada malformada) → `[]`.
+   */
+  private measureUnits(block: Block, element: HTMLElement, heightPx: number): readonly number[] {
+    if (!isSplittableBlock(block)) {
+      return [];
+    }
+    return blockKind(block) === 'list'
+      ? this.measureListUnits(element, heightPx)
+      : this.measureLines(element, heightPx);
+  }
+
+  /**
+   * Flujos de los `<li>` del elemento `<ol>/<ul>` (spec 06, REQ-03):
+   * `li[i+1].top − li[i].top` entre ítems contiguos; la última unidad
+   * completa hasta `heightPx` (regla de cierre — absorbe el espaciado
+   * residual del elemento, incluido el padding del `<ol>`; no repartir
+   * el padding a mano). Un solo ítem (o ninguno) → `[heightPx]`:
+   * de facto atómico. Los ítems anidados miden con su contenido dentro
+   * del `<li>` padre.
+   */
+  private measureListUnits(element: HTMLElement, heightPx: number): readonly number[] {
+    const items = Array.from(element.children) as HTMLElement[];
+    if (items.length <= 1) {
+      return [heightPx];
+    }
+    const tops = items.map((item) => item.getBoundingClientRect().top);
+    const units: number[] = [];
+    for (let i = 0; i + 1 < tops.length; i++) {
+      units.push(tops[i + 1] - tops[i]);
+    }
+    units.push(heightPx - units.reduce((sum, unit) => sum + unit, 0));
+    return units;
   }
 
   /**
@@ -113,5 +152,16 @@ export class MeasurementService {
     } catch {
       return [];
     }
+  }
+
+  /**
+   * Imágenes listas para medir (spec 06, REQ-04): `true` cuando todos los
+   * `<img>` del contenedor tienen `complete === true` (una imagen con
+   * error también deja `complete` en `true` — una URL rota no cuelga el
+   * flujo). Sin imágenes → `true`.
+   */
+  imagesReady(editorContainer: HTMLElement): boolean {
+    const images = editorContainer.querySelectorAll<HTMLImageElement>('img');
+    return Array.from(images).every((image) => image.complete);
   }
 }

@@ -1,6 +1,6 @@
 import type { Delta, Op } from 'quill';
 
-import type { Block } from './block';
+import type { Block, BlockKind } from './block';
 
 /**
  * Extracción pura de bloques (discovery §4, spec 04 REQ-02).
@@ -104,36 +104,75 @@ export const extractBlocks = (delta: Delta): readonly Block[] => {
   return blocks;
 };
 
-/** Atributos block-level que convierten un bloque en no-párrafo (spec 05, REQ-02). */
-const BLOCK_LEVEL_ATTRIBUTES: ReadonlySet<string> = new Set([
-  'header',
+/**
+ * Clasificación pura por tipo (spec 06, REQ-01). Los atributos de bloque
+ * son excluyentes por línea en Quill — el orden de KIND_BY_ATTRIBUTE es
+ * únicamente defensivo para entrada malformada, no una búsqueda de
+ * combinaciones reales. `align`/`indent` y los formatos inline NO
+ * cambian el tipo.
+ */
+const KIND_BY_ATTRIBUTE: readonly (readonly [string, BlockKind])[] = [
+  ['list', 'list'],
+  ['header', 'heading'],
+  ['blockquote', 'blockquote'],
+  ['code-block', 'code-block'],
+];
+
+const SPLITTABLE_KINDS: ReadonlySet<BlockKind> = new Set<BlockKind>([
+  'paragraph',
   'list',
   'blockquote',
   'code-block',
 ]);
 
-/**
- * Splittabilidad pura (spec 05, REQ-02): `true` si y solo si el op
- * terminador del bloque (el último op con `insert` terminado en `\n`) NO
- * tiene atributos block-level entre `header`, `list`, `blockquote`,
- * `code-block`. Los formatos inline y los embeds inline NO impiden el
- * corte — pertenecen a su línea. En esta spec solo los párrafos son
- * divisibles; la clasificación completa es de la spec 06 (RULE-019:
- * aditivo). Un párrafo de una sola línea es splittable por tipo; el
- * motor jamás lo divide.
- */
-export const isSplittableBlock = (block: Block): boolean => {
+/** El op terminador del bloque (el último op con `insert` terminado en `\n`). */
+const terminatorOp = (block: Block): Op | null => {
   for (let i = block.ops.length - 1; i >= 0; i--) {
     const op = block.ops[i];
     const insert: Op['insert'] = op.insert;
     if (typeof insert === 'string' && insert.endsWith('\n')) {
-      const attributes = op.attributes;
-      if (attributes === undefined) {
-        return true;
-      }
-      return Object.keys(attributes).every((key) => !BLOCK_LEVEL_ATTRIBUTES.has(key));
+      return op;
     }
   }
-  // Sin terminador de línea (defensivo, entrada malformada): indivisible.
-  return false;
+  return null;
+};
+
+/**
+ * Clasificador puro por tipo (spec 06, REQ-01). Sin op terminador
+ * (entrada malformada) se tipa `'paragraph'`; la rama defensiva de
+ * `isSplittableBlock` mantiene esos bloques indivisibles.
+ */
+export const blockKind = (block: Block): BlockKind => {
+  const terminator = terminatorOp(block);
+  if (terminator === null) {
+    return 'paragraph';
+  }
+  const attributes = terminator.attributes;
+  if (attributes === undefined) {
+    return 'paragraph';
+  }
+  for (const [attribute, kind] of KIND_BY_ATTRIBUTE) {
+    if (attribute in attributes) {
+      return kind;
+    }
+  }
+  return 'paragraph';
+};
+
+/**
+ * Matriz de divisibilidad (spec 06, REQ-02; reemplaza el predicado
+ * minimal de 05 — RULE-019 aditivo): paragraph, list, blockquote y
+ * code-block son divisibles (constitution §6, soporte progresivo);
+ * heading indivisible. CONSERVA la rama defensiva de 05: sin op
+ * terminador (entrada malformada) → `false`, con independencia de la
+ * matriz — así los updates declarados por 06 siguen siendo exactamente
+ * 3. Los formatos inline y los embeds inline NO impiden el corte. Un
+ * bloque divisible de una sola unidad no se divide (el motor lo trata
+ * atómicamente).
+ */
+export const isSplittableBlock = (block: Block): boolean => {
+  if (terminatorOp(block) === null) {
+    return false;
+  }
+  return SPLITTABLE_KINDS.has(blockKind(block));
 };
