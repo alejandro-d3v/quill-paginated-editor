@@ -13,6 +13,10 @@ import type { Block, BlockKind } from './block';
  * - los embeds inline (p. ej. image) se acumulan en el bloque de su línea
  *   — así los renderiza Quill, dentro del mismo hijo; un embed en línea
  *   propia forma un bloque con las ops de esa línea (embed + `\n`);
+ * - los embeds a nivel de BLOQUE (spec 07: `pageBreak`) auto-terminan su
+ *   línea — en el Delta de Quill NO llevan `\n` propio (así los segmenta
+ *   `Scroll#deltaToRenderBlocks`): cortan la línea en construcción y
+ *   forman un bloque propio, alineado 1:1 con su hijo block-level del DOM;
  * - los runs de listas consecutivas del mismo tipo se fusionan en UN bloque
  *   (contenido no soportado en 04 → indivisible, discovery §7);
  * - `id` = ordinal en orden de documento.
@@ -88,8 +92,17 @@ export const extractBlocks = (delta: Delta): readonly Block[] => {
           closeLine();
         }
       }
+    } else if (isBlockEmbedOp(op)) {
+      // Embed a nivel de bloque: auto-termina su línea (sin `\n` propio).
+      // Corta la línea en construcción y forma un bloque propio — espejo
+      // de `Scroll#deltaToRenderBlocks`, alineado 1:1 con el DOM.
+      if (lineOps.length > 0) {
+        closeLine();
+      }
+      lineOps.push({ ...op });
+      closeLine();
     } else if (insert !== undefined) {
-      // Embed: se acumula en la línea actual (Quill lo renderiza inline).
+      // Embed inline: se acumula en la línea actual (Quill lo renderiza inline).
       pushFragment({ ...op });
     }
   }
@@ -138,11 +151,30 @@ const terminatorOp = (block: Block): Op | null => {
 };
 
 /**
- * Clasificador puro por tipo (spec 06, REQ-01). Sin op terminador
- * (entrada malformada) se tipa `'paragraph'`; la rama defensiva de
- * `isSplittableBlock` mantiene esos bloques indivisibles.
+ * Embed a nivel de bloque (spec 07, REQ-03): `{ pageBreak: true }`. En el
+ * Delta de Quill estos embeds auto-terminan su línea — sin `\n` propio —
+ * así que son la única clase de bloque sin op terminador. La detección es
+ * por clave: `pageBreak` es el único block embed que esta app registra; un
+ * block embed desconocido (p. ej. pegado) desalinearía el conteo y falla
+ * rápido en `MeasurementService` — nunca coloca contenido en silencio.
+ */
+const isBlockEmbedOp = (op: Op): boolean => {
+  const insert: Op['insert'] = op.insert;
+  return typeof insert === 'object' && 'pageBreak' in insert;
+};
+
+/**
+ * Clasificador puro por tipo (spec 06, REQ-01; spec 07, REQ-03). El embed
+ * `{ pageBreak: true }` manda primero (el marcador auto-termina su línea:
+ * sin esta detección, la rama defensiva lo tiparía `'paragraph'`); el
+ * resto se deriva del op terminador. Sin op terminador (entrada malformada)
+ * se tipa `'paragraph'`; la rama defensiva de `isSplittableBlock` mantiene
+ * esos bloques indivisibles.
  */
 export const blockKind = (block: Block): BlockKind => {
+  if (block.ops.some(isBlockEmbedOp)) {
+    return 'page-break';
+  }
   const terminator = terminatorOp(block);
   if (terminator === null) {
     return 'paragraph';
@@ -163,12 +195,13 @@ export const blockKind = (block: Block): BlockKind => {
  * Matriz de divisibilidad (spec 06, REQ-02; reemplaza el predicado
  * minimal de 05 — RULE-019 aditivo): paragraph, list, blockquote y
  * code-block son divisibles (constitution §6, soporte progresivo);
- * heading indivisible. CONSERVA la rama defensiva de 05: sin op
- * terminador (entrada malformada) → `false`, con independencia de la
- * matriz — así los updates declarados por 06 siguen siendo exactamente
- * 3. Los formatos inline y los embeds inline NO impiden el corte. Un
- * bloque divisible de una sola unidad no se divide (el motor lo trata
- * atómicamente).
+ * heading y page-break indivisibles (spec 07, REQ-03: el marcador se
+ * cortaría del contenido que delimita). CONSERVA la rama defensiva de
+ * 05: sin op terminador (entrada malformada) → `false`, con
+ * independencia de la matriz — así los updates declarados por 06 siguen
+ * siendo exactamente 3. Los formatos inline y los embeds inline NO
+ * impiden el corte. Un bloque divisible de una sola unidad no se divide
+ * (el motor lo trata atómicamente).
  */
 export const isSplittableBlock = (block: Block): boolean => {
   if (terminatorOp(block) === null) {

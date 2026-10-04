@@ -22,6 +22,14 @@ const splittableBlock = (id: number, lines: readonly number[]): MeasuredBlock =>
   minFragmentHeightPx: lines[0],
 });
 
+/** Fixture: marcador de salto manual (spec 07, REQ-04) — atómico con bandera. */
+const breakBlock = (id: number, heightPx: number): MeasuredBlock => ({
+  id,
+  heightPx,
+  splittable: false,
+  manualBreakAfter: true,
+});
+
 /** Fixture: geometría mínima para el motor (solo consume contentHeightPx). */
 const geometry = (contentHeightPx: number): PageGeometry =>
   ({ contentHeightPx }) as unknown as PageGeometry;
@@ -203,6 +211,44 @@ describe('paginate — listas divisibles (spec 06, REQ-05)', () => {
   });
 });
 
+describe('paginate — saltos de página manuales (spec 07, REQ-04)', () => {
+  it('cierra la página tras el marcador aunque quede espacio', () => {
+    const result = paginate([atomic(0, 30), breakBlock(1, 10), atomic(2, 40)], geometry(100));
+    expect(result.pages.length).toBe(2);
+    expect(result.pages[0]!.blocks.map((b) => b.id)).toEqual([0, 1]);
+    expect(result.pages[1]!.blocks.map((b) => b.id)).toEqual([2]);
+  });
+
+  it('marcador como último bloque no produce página vacía final', () => {
+    const result = paginate([atomic(0, 30), breakBlock(1, 10)], geometry(100));
+    expect(result.pages.length).toBe(1);
+    expect(result.pages[0]!.blocks.map((b) => b.id)).toEqual([0, 1]);
+  });
+
+  it('marcadores consecutivos: una página por marcador, cada una lleva el suyo', () => {
+    const result = paginate([breakBlock(0, 10), breakBlock(1, 10), atomic(2, 30)], geometry(100));
+    expect(result.pages.length).toBe(3);
+    expect(result.pages[0]!.blocks.map((b) => b.id)).toEqual([0]);
+    expect(result.pages[1]!.blocks.map((b) => b.id)).toEqual([1]);
+    expect(result.pages[2]!.blocks.map((b) => b.id)).toEqual([2]);
+  });
+
+  it('marcador desbordante: solo en su página, cierre manual sin página vacía', () => {
+    const result = paginate([atomic(0, 30), breakBlock(1, 250)], geometry(100));
+    expect(result.pages.length).toBe(2);
+    expect(result.pages[0]!.blocks.map((b) => b.id)).toEqual([0]);
+    expect(result.pages[1]!.blocks.map((b) => b.id)).toEqual([1]);
+  });
+
+  it('los marcadores no pierden contenido circundante (RULE-011)', () => {
+    const result = paginate(
+      [atomic(0, 30), breakBlock(1, 10), atomic(2, 40), breakBlock(3, 10), atomic(4, 50)],
+      geometry(100)
+    );
+    expect(concatenatedIds(result)).toEqual([0, 1, 2, 3, 4]);
+  });
+});
+
 describe('paginate — invariant de reconstrucción de líneas (RULE-011, spec 05)', () => {
   const fragmentsOf = (document: LayoutDocument, id: number): readonly LayoutBlock[] =>
     document.pages.flatMap((page) => page.blocks.filter((block) => block.id === id));
@@ -240,6 +286,7 @@ describe('paginate — invariant de reconstrucción de líneas (RULE-011, spec 0
       splittableBlock(3, [50, 50]),
       splittableBlock(4, [30, 40]),
       splittableBlock(5, [50, 20, 50]), // lista divisible (spec 06)
+      breakBlock(6, 10), // marcador manual (spec 07): una pieza, sin rango
     ];
     const result = paginate(fixtures, geometry(100));
     for (const block of fixtures) {

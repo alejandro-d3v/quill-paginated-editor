@@ -294,6 +294,48 @@ describe('MeasurementService.measure — medición de líneas (spec 05, REQ-06)'
   });
 });
 
+describe('MeasurementService.measure — saltos manuales (spec 07, REQ-03)', () => {
+  const pageBreak = (id: number): Block => ({
+    id,
+    ops: [{ insert: { pageBreak: true } }], // auto-termina su línea: sin `\n` propio
+  });
+
+  const firstChildOf = (container: HTMLElement): HTMLElement => {
+    const child = container.querySelector<HTMLElement>('.ql-editor > p');
+    if (child === null) {
+      throw new Error('fixture sin hijo block-level');
+    }
+    return child;
+  };
+
+  it('marcador: manualBreakAfter true, indivisible, altura de flujo normal', () => {
+    const service = new MeasurementService();
+    const container = containerWithEditor(1);
+    firstChildOf(container).getBoundingClientRect = () => rect(0, 30);
+
+    const result = service.measure([pageBreak(0)], container);
+
+    expect(result[0]).toEqual({
+      id: 0,
+      heightPx: 30,
+      splittable: false,
+      lineHeightsPx: [],
+      manualBreakAfter: true,
+    });
+  });
+
+  it('bloques normales no llevan la bandera manualBreakAfter', () => {
+    const service = new MeasurementService();
+    const container = containerWithEditor(1);
+    firstChildOf(container).getBoundingClientRect = () => rect(0, 30);
+    const paragraph: Block = { id: 0, ops: [{ insert: 'hola\n' }] };
+
+    const result = service.measure([paragraph], container);
+
+    expect('manualBreakAfter' in result[0]!).toBe(false);
+  });
+});
+
 describe('MeasurementService.imagesReady (spec 06, REQ-04)', () => {
   it('sin imágenes → true', () => {
     const service = new MeasurementService();

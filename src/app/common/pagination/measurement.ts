@@ -72,7 +72,9 @@ export class MeasurementService {
             minFragmentHeightPx: lineHeightsPx[0],
           }
         : { id: block.id, heightPx, splittable, lineHeightsPx };
-      return measured;
+      // Salto manual (spec 07, REQ-03): bandera para el motor; el marcador
+      // fluye con altura normal — A1 mide lo que el DOM renderiza.
+      return blockKind(block) === 'page-break' ? { ...measured, manualBreakAfter: true } : measured;
     });
   }
 

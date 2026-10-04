@@ -16,8 +16,12 @@ export type BlockId = number;
  * extensión "tipo de bloque"). Derivada de los atributos del op
  * terminador; `align`/`indent` y los formatos inline NO cambian el tipo.
  * El motor no consume tipos: la unidad de corte la fija la medición.
+ * `'page-break'` (spec 07, REQ-03): marcador de salto manual — se detecta
+ * por el embed `{ pageBreak: true }` del bloque, con precedencia sobre
+ * los atributos del terminador.
  */
-export type BlockKind = 'paragraph' | 'heading' | 'list' | 'blockquote' | 'code-block';
+export type BlockKind =
+  'paragraph' | 'heading' | 'list' | 'blockquote' | 'code-block' | 'page-break';
 
 /** Fragmento del Delta que representa un bloque; formatos inline preservados en `ops`. */
 export interface Block {
@@ -51,4 +55,12 @@ export interface MeasuredBlock {
   readonly splittable: boolean;
   readonly minFragmentHeightPx?: number;
   readonly lineHeightsPx?: readonly number[];
+  /**
+   * Salto de página manual (spec 07, REQ-03): `true` cuando el bloque es
+   * un marcador `pageBreak`. El motor cierra la página que lo porta
+   * aunque quede espacio — pero jamás produce una página vacía (REQ-04).
+   * Opcional en el tipo: los fixtures de 04–06 siguen compilando sin
+   * edición (RULE-019).
+   */
+  readonly manualBreakAfter?: boolean;
 }

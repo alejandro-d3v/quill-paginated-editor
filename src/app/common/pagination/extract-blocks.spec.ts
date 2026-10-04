@@ -95,6 +95,40 @@ describe('extractBlocks', () => {
     ]);
   });
 
+  it('salto manual entre párrafos → bloque propio (auto-termina su línea, spec 07)', () => {
+    const blocks = extractBlocks(
+      doc([{ insert: 'a\n' }, { insert: { pageBreak: true } }, { insert: 'b\n' }])
+    );
+    expect(blocks.length).toBe(3);
+    expect(blocks[1]!.ops).toEqual([{ insert: { pageBreak: true } }]);
+  });
+
+  it('salto manual tras línea parcial corta la línea (espejo del split de Quill)', () => {
+    const blocks = extractBlocks(
+      doc([{ insert: 'a' }, { insert: { pageBreak: true } }, { insert: 'b\n' }])
+    );
+    expect(blocks.length).toBe(3);
+    expect(blocks[0]!.ops).toEqual([{ insert: 'a' }]);
+    expect(blocks[1]!.ops).toEqual([{ insert: { pageBreak: true } }]);
+    expect(blocks[2]!.ops).toEqual([{ insert: 'b\n' }]);
+  });
+
+  it('salto manual seguido de `\\n` → bloque del marcador + bloque de párrafo vacío', () => {
+    const blocks = extractBlocks(doc([{ insert: { pageBreak: true } }, { insert: '\n' }]));
+    expect(blocks.length).toBe(2);
+    expect(blocks[0]!.ops).toEqual([{ insert: { pageBreak: true } }]);
+    expect(blocks[1]!.ops).toEqual([{ insert: '\n' }]);
+  });
+
+  it('saltos manuales consecutivos → un bloque por marcador', () => {
+    const blocks = extractBlocks(
+      doc([{ insert: { pageBreak: true } }, { insert: { pageBreak: true } }])
+    );
+    expect(blocks.length).toBe(2);
+    expect(blocks[0]!.ops).toEqual([{ insert: { pageBreak: true } }]);
+    expect(blocks[1]!.ops).toEqual([{ insert: { pageBreak: true } }]);
+  });
+
   it('no muta el Delta de entrada (RULE-003)', () => {
     const ops: Op[] = [
       { insert: 'a\n', attributes: { list: 'bullet' } },
@@ -215,5 +249,23 @@ describe('blockKind (spec 06, REQ-01)', () => {
 
   it('sin op terminador (defensivo) → paragraph', () => {
     expect(blockKind(blockOf([{ insert: 'sin salto' }]))).toBe('paragraph');
+  });
+});
+
+describe('blockKind — saltos de página manuales (spec 07, REQ-03)', () => {
+  const blockOf = (ops: readonly Op[]): Block => ({ id: 0, ops });
+
+  it('bloque de marcador (embed solo, sin `\\n` propio) → page-break', () => {
+    expect(blockKind(blockOf([{ insert: { pageBreak: true } }]))).toBe('page-break');
+  });
+
+  it('la detección del marcador es específica de la clave pageBreak (regresión 06)', () => {
+    expect(blockKind(blockOf([{ insert: { image: 'x.png' } }, { insert: ' texto\n' }]))).toBe(
+      'paragraph'
+    );
+  });
+
+  it('marcador → indivisible (sin terminador, fuera de la matriz SPLITTABLE)', () => {
+    expect(isSplittableBlock(blockOf([{ insert: { pageBreak: true } }]))).toBe(false);
   });
 });

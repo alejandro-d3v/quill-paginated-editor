@@ -39,6 +39,10 @@ export interface LayoutDocument {
  *   (`heightPx > contentHeightPx`, o geometría degenerada
  *   `contentHeightPx ≤ 0`) se coloca SOLO en su propia página y desborda:
  *   jamás se descarta ni se recorta (RULE-011);
+ * - un bloque con `manualBreakAfter` (spec 07) cierra la página que lo
+ *   porta aunque quede espacio — sin producir páginas vacías: el marcador
+ *   va dentro de la página que cierra y, si desborda, esa página ya se
+ *   cerró por desborde (el cierre manual no se aplica dos veces).
  *
  * Párrafos divisibles (spec 05, §7.3) se cortan por líneas:
  * - las líneas llenan el alto restante en orden de flujo (RULE-010:
@@ -70,7 +74,15 @@ export const paginate = (
     remainingPx = geometry.contentHeightPx;
   };
 
-  /** Camino atómico de la spec 04 — sin cambios de comportamiento (RULE-020). */
+  /**
+   * Camino atómico de la spec 04 — comportamiento invariante (RULE-020),
+   * extendido por la spec 07 (REQ-04): si el bloque porta
+   * `manualBreakAfter`, la página que lo contiene se cierra aunque quede
+   * espacio. El cierre manual jamás produce una página vacía:
+   * - el marcador ya está en la página al cerrar (`push` previo);
+   * - si el bloque desborda, la página que lo porta ya se cerró por
+   *   desborde — el cierre manual no se aplica dos veces.
+   */
   const placeAtomic = (block: MeasuredBlock): void => {
     if (currentBlocks.length > 0 && block.heightPx > remainingPx) {
       closePage();
@@ -78,8 +90,13 @@ export const paginate = (
     currentBlocks.push({ id: block.id, heightPx: block.heightPx });
     if (block.heightPx <= remainingPx) {
       remainingPx -= block.heightPx;
+      if (block.manualBreakAfter === true) {
+        // Salto manual (spec 07): cierra con el marcador dentro.
+        closePage();
+      }
     } else {
       // No cabe ni en una página vacía: bloque solo en su página (desborda).
+      // La página que porta el marcador ya quedó cerrada por el desborde.
       closePage();
     }
   };

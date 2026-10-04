@@ -26,3 +26,31 @@
     font-style: normal;
   }
 }
+
+/*
+ * Marcador de salto de página manual (spec 07, REQ-01): contenido real del
+ * documento (block embed), distinguible del indicador punteado gris del
+ * overlay (A1). El marcador viaja en el Delta; esto es solo presentación.
+ */
+.page-break {
+  border-top: 2px dashed #2f6fdb;
+  margin: 8px 0;
+}
+
+.page-break::after {
+  content: 'Salto de página';
+  display: block;
+  color: #2f6fdb;
+  font-size: 11px;
+  font-family: system-ui, sans-serif;
+  padding: 2px 0;
+}
+
+/*
+ * Botón de toolbar del salto manual (spec 07, REQ-02): sin icono nativo de
+ * Quill para este item; el glifo lo aporta la app vía CSS. El nombre
+ * accesible lo fija el wrapper (`aria-label`), no el contenido visual.
+ */
+.ql-page-break::after {
+  content: '⤓';
+}
