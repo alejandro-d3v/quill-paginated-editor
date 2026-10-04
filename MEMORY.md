@@ -5,36 +5,35 @@ aporte. Las reglas permanentes viven en `AGENTS.md`, no aquí.
 
 ## Estado actual
 
-- **04-pagination-mvp COMPLETA** (2026-10-04): el motor existe. `common/pagination/` gana `block.ts`, `extract-blocks.ts`, `paginate.ts` (puros) y `measurement.ts` (`MeasurementService`, browser-only). `home` cablea el seam con `effect()` coalescido; `PageBreakIndicators` dibuja los cortes sobre el marco.
-- Pipeline: `deltaChange` → `extractBlocks` → `measure(blocks, editorElement())` → `paginate(measured, geometry())` → `layout` → overlay. Bloques atómicos (regla indivisible, discovery §7).
-- Suite verde: 72 tests / 12 archivos (+32 del motor: 9 paginate, 11 extract, 5 measurement, 4 indicators, 1 home, +2 ajustes). Lint 0/0; build 240.2 kB initial (+8.8 kB).
-- Wrapper: `editorElement` viewChild readonly público = superficie de medición (la instancia de Quill sigue encapsulada).
-- Warning de build preexistente: `quill-delta` CommonJS. `AGENTS.md` sincronizado (§1 estado).
-- Aún sin splitting (05), clasificación/imágenes async (06), breaks (07), bandas (08), PDF (09), incremental (10).
+- **05-content-splitting COMPLETA** (2026-10-04): los párrafos se cortan entre páginas por líneas renderizadas. `MeasuredBlock.lineHeightsPx` (sum === alto de flujo) + `minFragmentHeightPx` (primera línea); motor emite fragmentos `LayoutBlock.lineRange {from,to}` (semicerrado; ausente = bloque completo). Solo párrafos divisibles (`isSplittableBlock`); headings/listas/blockquotes/code-blocks atómicos hasta 06.
+- Vista, wrapper y DOM del editor **intactos** (diff: solo `common/pagination/`) — los fragmentos acarrean `heightPx`, indicadores transparentes al corte.
+- Suite verde: 94 tests / 12 archivos (+22 del corte). Lint 0/0; build 240.2 kB initial (+1.4 kB). Warning preexistente `quill-delta` CommonJS.
+- Pendiente de 10: calibración de viudas/huérfanas (huérfana = medición; **viuda requiere extensión simétrica del motor** — anotado en la spec).
 
-## Decisiones (00-discovery en `docs/discovery.md`; 01–04 aquí)
+## Decisiones (00-discovery en `docs/discovery.md`; 01–05 aquí)
 
-- **04 — seam**: `paginate(measuredBlocks, geometry)` puro + `MeasurementService.measure(blocks, editorContainer)`; ids canónicos desde `extractBlocks`; desalineo de conteo → `Error` (fail-fast browser-side — silenciar colocaría contenido en páginas erróneas).
-- **04 — altura de flujo**: `heightPx` = diferencia de offsets entre bloques contiguos (último: rect + margin inferior) — un rect desnudo ignora márgenes y desfasa motor y overlay (Principle V).
-- **04 — segmentación alineada con Quill**: embeds inline acumulan en su línea (image es inline); runs de listas del mismo tipo = un bloque; el Delta de documento es insert-only.
-- **04 — recomputación coalescida** vía `effect()`: una ejecución por lote con el último estado; flujo unidireccional (el pipeline jamás escribe `content`/`settings`). Debouncing/incremental → 10.
-- **01–03** — Delta desde `'quill'`; validadores estructural (01) y geométrico (02) separados; caparazón visual A1 con `PageFrame`/`PagesContainer`.
+- **05 — descriptores, no división física** (discovery §3): el Delta permanece continuo; `lineRange` es el contrato para 09 (PDF resolverá contenido por id + rango de líneas).
+- **05 — regla de última línea**: `sum(lineHeightsPx) === heightPx` (línea i = top_{i+1}−top_i; la última completa) — los offsets acumulados de los indicadores quedan exactos sin tocar la vista.
+- **05 — huérfana mínima**: `minFragmentHeightPx` = primera línea; ≥1 línea por lado garantizado estructuralmente. El chequeo del lado inicial es hook de tuning (tautológico al valor 05).
+- **05 — fallback de medición**: sin rects/Range (jsdom) → `[heightPx]` → bloque de facto atómico (degradación segura). Dos fases en el motor (simulación sin mutar `remainingPx`) para que un corte inválido caiga a atómico sin deshacer consumo.
+- **04** — seam `paginate` puro + `measure(blocks, container)` fail-fast; alturas de flujo por diferencia de offsets; embeds inline acumulan en su línea; runs de listas fusionados.
+- **01–03** — Delta desde `'quill'`; validadores estructural/geométrico separados; caparazón visual A1.
 
 ## Aprendizajes y errores a evitar
 
-- TS no rastrea mutaciones en closures: tras un loop que muta vía closure, la variable queda falsamente estrechada — pasarla como parámetro a un helper (o reestructurar) para el chequeo final.
-- `restrict-template-expressions`: números en template literals requieren `String()`.
-- Quill renderiza images INLINE (dentro del `<p>`): la extracción debe acumularlas en su línea, nunca partirlas en bloque propio.
-- `parseFloat(getComputedStyle(...)) || 0`: jsdom devuelve márgenes vacíos — el `|| 0` es necesario.
-- Tests DOM: `const native: HTMLElement = fixture.nativeElement` (está tipado `any`); `input.required` necesita `setInput` antes del primer `whenStable()`.
-- Alias `@common` no resuelve; sub-bullets anidados rompen Prettier en tasks.md; skills citan secciones AGENTS.md desfasadas (por nombre).
+- `Block` es tipo nuestro (`./block`), no de Quill — TS2614 si se importa desde `'quill'`.
+- `no-useless-assignment`: inicializadores de `let` nunca leídos; extraer helpers (`lineRects` con try/catch).
+- Grep de pureza con "Range" da falsos positivos por `lineRange` — usar patrones precisos (`createRange`/`getClientRects`).
+- `vi.spyOn(document, 'createRange')` + `mockReturnValue(fakeRange)` para tests de medición de líneas; `vi.restoreAllMocks()` en afterEach.
+- Contratos evolucionados (REQ-01 de 05): el productor SIEMPRE emite `lineHeightsPx` — las expectativas de 04 ganaron `lineHeightsPx: []` (semántica intacta).
+- Alias `@common` no resuelve; sub-bullets anidados rompen Prettier en tasks.md; skills citan secciones AGENTS.md por nombre.
 
 ## Próximos pasos
 
-- **Revisión manual humana en navegador** (pendiente de 04): pipeline end-to-end con texto real, indicadores en los cortes, AXE.
-- Luego: `/spec-write 05-content-splitting` (plantilla) → review → feature. Habilita `splittable: true` para párrafos (constitution §7.3), `minFragmentHeightPx`, descriptores de corte en `LayoutDocument`.
+- **Revisión manual humana en navegador** (pendiente de 04 y 05): párrafos largos reales cortándose, indicadores en las fronteras, AXE.
+- Luego: `/spec-write 06-complex-blocks` (plantilla) → review → feature. Clasificación real de bloques (reemplaza el predicado minimal), reglas de listas, imágenes async; tablas → 06b o descope.
 
 ## Pendientes / dudas abiertas
 
-- PDF (09) · tablas 06b · virtualización (10) · widows/orphans (05) · render de header/footer: tokens vs Delta (08).
+- PDF (09) · tablas 06b · virtualización (10) · calibración viudas/huérfanas (10) · render de header/footer: tokens vs Delta (08).
 - Corregir referencias cruzadas de skills y ubicar/eliminar `temp/pagination-spec/` — requieren aprobación del usuario.

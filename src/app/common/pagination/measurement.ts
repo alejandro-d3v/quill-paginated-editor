@@ -1,9 +1,10 @@
 import { Injectable } from '@angular/core';
 
 import type { Block, MeasuredBlock } from './block';
+import { isSplittableBlock } from './extract-blocks';
 
 /**
- * Capa browser-only del seam de medición (discovery §4, spec 04 REQ-04).
+ * Capa browser-only del seam de medición (discovery §4; specs 04 y 05).
  *
  * Mide los bloques ya renderizados por Quill dentro del contenedor del
  * editor (A1 — la paginación lee el DOM renderizado; jamás lo
@@ -13,6 +14,13 @@ import type { Block, MeasuredBlock } from './block';
  * desalineo silencioso colocaría contenido en páginas erróneas, que es
  * peor (RULE-011). Los módulos puros de paginación no importan este
  * servicio (RULE-006).
+ *
+ * Desde la spec 05: para bloques divisibles (`isSplittableBlock`) produce
+ * `lineHeightsPx` (geometría de líneas renderizadas, RULE-010 — jamás
+ * conteo de caracteres) y `minFragmentHeightPx` = primera línea. Con el
+ * fallback (`lineHeightsPx = [heightPx]`), `minFragmentHeightPx =
+ * heightPx` y el bloque se degrada a atómico — seguro: nunca pierde
+ * contenido.
  */
 @Injectable({ providedIn: 'root' })
 export class MeasurementService {
@@ -53,7 +61,57 @@ export class MeasurementService {
         index < lastIndex
           ? rects[index + 1].top - rects[index].top
           : rects[index].height + lastMarginBottomPx;
-      return { id: block.id, heightPx, splittable: false };
+      const splittable = isSplittableBlock(block);
+      const lineHeightsPx = splittable ? this.measureLines(children[index], heightPx) : [];
+      const measured: MeasuredBlock = splittable
+        ? {
+            id: block.id,
+            heightPx,
+            splittable,
+            lineHeightsPx,
+            minFragmentHeightPx: lineHeightsPx[0],
+          }
+        : { id: block.id, heightPx, splittable, lineHeightsPx };
+      return measured;
     });
+  }
+
+  /**
+   * Alturas de las líneas renderizadas del elemento (spec 05, REQ-03).
+   * Técnica: `Range` sobre el contenido + `getClientRects()`, agrupando
+   * rects por `top` (una línea por grupo). Regla de cierre (REQ-01): la
+   * línea i mide `top_{i+1} − top_i` y la última completa hasta
+   * `heightPx` — `sum === heightPx` exacto. Si la agrupación no es
+   * perfecta (imágenes inline: varios rects por línea), la suma sigue
+   * siendo exacta y el desvío queda contenido dentro del bloque.
+   * Fallback determinista (sin rects o sin soporte de Range, p. ej. jsdom):
+   * `[heightPx]` — una línea; de facto atómico.
+   */
+  private measureLines(element: HTMLElement, heightPx: number): readonly number[] {
+    const rects = this.lineRects(element);
+    if (rects.length === 0) {
+      return [heightPx];
+    }
+    const tops = [...new Set(rects.map((rect) => rect.top))].sort((a, b) => a - b);
+    if (tops.length <= 1) {
+      return [heightPx];
+    }
+    const lines: number[] = [];
+    for (let i = 0; i + 1 < tops.length; i++) {
+      lines.push(tops[i + 1] - tops[i]);
+    }
+    lines.push(heightPx - lines.reduce((sum, line) => sum + line, 0));
+    return lines;
+  }
+
+  /** Rects del contenido del elemento; `[]` si el entorno no soporta Range. */
+  private lineRects(element: HTMLElement): readonly DOMRect[] {
+    try {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      return Array.from(range.getClientRects());
+    } catch {
+      return [];
+    }
   }
 }

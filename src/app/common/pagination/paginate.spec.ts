@@ -1,10 +1,26 @@
 import type { MeasuredBlock } from './block';
 import type { PageGeometry } from './page-geometry';
-import { paginate, type LayoutDocument } from './paginate';
+import { paginate, type LayoutBlock, type LayoutDocument } from './paginate';
 
 /** Fixture: bloques medidos (atómicos) a partir de alturas. */
 const measured = (heights: readonly number[]): MeasuredBlock[] =>
   heights.map((heightPx, id) => ({ id, heightPx, splittable: false }));
+
+/** Fixture: bloque atómico explícito (id propio). */
+const atomic = (id: number, heightPx: number): MeasuredBlock => ({
+  id,
+  heightPx,
+  splittable: false,
+});
+
+/** Fixture: bloque divisible con líneas medidas (contrato: sum === heightPx). */
+const splittableBlock = (id: number, lines: readonly number[]): MeasuredBlock => ({
+  id,
+  heightPx: lines.reduce((sum, line) => sum + line, 0),
+  splittable: true,
+  lineHeightsPx: lines,
+  minFragmentHeightPx: lines[0],
+});
 
 /** Fixture: geometría mínima para el motor (solo consume contentHeightPx). */
 const geometry = (contentHeightPx: number): PageGeometry =>
@@ -88,5 +104,136 @@ describe('paginate — entrada no mutada', () => {
     const before = JSON.parse(JSON.stringify(blocks)) as MeasuredBlock[];
     paginate(blocks, geometry(100));
     expect(blocks).toEqual(before);
+  });
+});
+
+describe('paginate — corte de párrafos (§7.3, spec 05)', () => {
+  it('corta cuando la siguiente línea no cabe y continúa en la página siguiente', () => {
+    const result = paginate([atomic(0, 30), splittableBlock(1, [30, 30, 30])], geometry(100));
+    expect(result.pages.length).toBe(2);
+    expect(result.pages[0]!.blocks[0]).toEqual({ id: 0, heightPx: 30 });
+    expect(result.pages[0]!.blocks[1]).toEqual({
+      id: 1,
+      heightPx: 60,
+      lineRange: { from: 0, to: 2 },
+    });
+    expect(result.pages[1]!.blocks).toEqual([
+      { id: 1, heightPx: 30, lineRange: { from: 2, to: 3 } },
+    ]);
+  });
+
+  it('multi-split: un párrafo a través de tres páginas', () => {
+    const result = paginate([splittableBlock(0, [40, 40, 40, 40, 40])], geometry(100));
+    expect(result.pages.length).toBe(3);
+    expect(result.pages[0]!.blocks[0]).toEqual({
+      id: 0,
+      heightPx: 80,
+      lineRange: { from: 0, to: 2 },
+    });
+    expect(result.pages[1]!.blocks[0]).toEqual({
+      id: 0,
+      heightPx: 80,
+      lineRange: { from: 2, to: 4 },
+    });
+    expect(result.pages[2]!.blocks[0]).toEqual({
+      id: 0,
+      heightPx: 40,
+      lineRange: { from: 4, to: 5 },
+    });
+  });
+
+  it('si la primera línea no cabe, el bloque arranca en la página siguiente sin fragmento de cero líneas', () => {
+    const result = paginate([atomic(0, 60), splittableBlock(1, [50, 50])], geometry(100));
+    expect(result.pages[0]!.blocks).toEqual([{ id: 0, heightPx: 60 }]);
+    expect(result.pages[1]!.blocks).toEqual([{ id: 1, heightPx: 100 }]);
+  });
+
+  it('línea desbordante: sola en su página y el bloque continúa (sin pérdida)', () => {
+    const result = paginate([splittableBlock(0, [250, 30])], geometry(100));
+    expect(result.pages[0]!.blocks).toEqual([
+      { id: 0, heightPx: 250, lineRange: { from: 0, to: 1 } },
+    ]);
+    expect(result.pages[1]!.blocks).toEqual([
+      { id: 0, heightPx: 30, lineRange: { from: 1, to: 2 } },
+    ]);
+  });
+
+  it('sin descriptor cuando el párrafo cabe completo (ausente = bloque completo)', () => {
+    const result = paginate([splittableBlock(0, [30, 40])], geometry(100));
+    expect(result.pages.length).toBe(1);
+    expect(result.pages[0]!.blocks).toEqual([{ id: 0, heightPx: 70 }]);
+  });
+
+  it('párrafo de una línea y bloques indivisibles siguen el camino atómico', () => {
+    const result = paginate([splittableBlock(0, [80]), atomic(1, 120)], geometry(100));
+    expect(result.pages.length).toBe(2);
+    expect(result.pages[0]!.blocks).toEqual([{ id: 0, heightPx: 80 }]);
+    expect(result.pages[1]!.blocks).toEqual([{ id: 1, heightPx: 120 }]);
+  });
+
+  it('geometría degenerada: cada línea queda sola en su página, sin pérdida', () => {
+    const result = paginate([splittableBlock(0, [30, 40])], geometry(0));
+    expect(result.pages.length).toBe(2);
+    expect(result.pages[0]!.blocks).toEqual([
+      { id: 0, heightPx: 30, lineRange: { from: 0, to: 1 } },
+    ]);
+    expect(result.pages[1]!.blocks).toEqual([
+      { id: 0, heightPx: 40, lineRange: { from: 1, to: 2 } },
+    ]);
+  });
+});
+
+describe('paginate — invariant de reconstrucción de líneas (RULE-011, spec 05)', () => {
+  const fragmentsOf = (document: LayoutDocument, id: number): readonly LayoutBlock[] =>
+    document.pages.flatMap((page) => page.blocks.filter((block) => block.id === id));
+
+  const assertFullyPreserved = (block: MeasuredBlock, document: LayoutDocument): void => {
+    const fragments = fragmentsOf(document, block.id);
+    expect(fragments.length).toBeGreaterThan(0);
+    // Suma de alturas == altura del bloque (sin pérdida de flujo).
+    const heightSum = fragments.reduce((sum, fragment) => sum + fragment.heightPx, 0);
+    expect(heightSum).toBe(block.heightPx);
+    // Rangos tilean [0, n) exactamente (o el bloque cabe completo).
+    const totalLines = (block.lineHeightsPx ?? []).length;
+    if (fragments[0]!.lineRange === undefined) {
+      expect(fragments.length).toBe(1);
+      return;
+    }
+    let cursor = 0;
+    for (const fragment of fragments) {
+      const range = fragment.lineRange;
+      expect(range).toBeDefined();
+      expect(range!.from).toBe(cursor);
+      expect(range!.to).toBeGreaterThan(range!.from);
+      cursor = range!.to;
+    }
+    expect(cursor).toBe(totalLines);
+    // Huérfana mínima: el fragmento inicial alcanza minFragmentHeightPx.
+    expect(fragments[0]!.heightPx).toBeGreaterThanOrEqual(block.minFragmentHeightPx ?? 0);
+  };
+
+  it('los fragmentos tilean [0, n) exactamente y suman el bloque — todos los fixtures de corte', () => {
+    const fixtures: readonly MeasuredBlock[] = [
+      splittableBlock(0, [40, 40, 40, 40, 40]),
+      splittableBlock(1, [30, 30, 30]),
+      splittableBlock(2, [250, 30]),
+      splittableBlock(3, [50, 50]),
+      splittableBlock(4, [30, 40]),
+    ];
+    const result = paginate(fixtures, geometry(100));
+    for (const block of fixtures) {
+      assertFullyPreserved(block, result);
+    }
+  });
+
+  it('determinismo y entrada no mutada con splitting', () => {
+    const blocks: MeasuredBlock[] = [
+      splittableBlock(0, [40, 40, 40, 40, 40]),
+      atomic(1, 30),
+      splittableBlock(2, [250, 30]),
+    ];
+    const g = geometry(100);
+    expect(paginate(blocks, g)).toEqual(paginate(blocks, g));
+    expect(blocks).toEqual(JSON.parse(JSON.stringify(blocks)) as MeasuredBlock[]);
   });
 });

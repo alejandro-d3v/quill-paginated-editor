@@ -103,3 +103,37 @@ export const extractBlocks = (delta: Delta): readonly Block[] => {
 
   return blocks;
 };
+
+/** Atributos block-level que convierten un bloque en no-párrafo (spec 05, REQ-02). */
+const BLOCK_LEVEL_ATTRIBUTES: ReadonlySet<string> = new Set([
+  'header',
+  'list',
+  'blockquote',
+  'code-block',
+]);
+
+/**
+ * Splittabilidad pura (spec 05, REQ-02): `true` si y solo si el op
+ * terminador del bloque (el último op con `insert` terminado en `\n`) NO
+ * tiene atributos block-level entre `header`, `list`, `blockquote`,
+ * `code-block`. Los formatos inline y los embeds inline NO impiden el
+ * corte — pertenecen a su línea. En esta spec solo los párrafos son
+ * divisibles; la clasificación completa es de la spec 06 (RULE-019:
+ * aditivo). Un párrafo de una sola línea es splittable por tipo; el
+ * motor jamás lo divide.
+ */
+export const isSplittableBlock = (block: Block): boolean => {
+  for (let i = block.ops.length - 1; i >= 0; i--) {
+    const op = block.ops[i];
+    const insert: Op['insert'] = op.insert;
+    if (typeof insert === 'string' && insert.endsWith('\n')) {
+      const attributes = op.attributes;
+      if (attributes === undefined) {
+        return true;
+      }
+      return Object.keys(attributes).every((key) => !BLOCK_LEVEL_ATTRIBUTES.has(key));
+    }
+  }
+  // Sin terminador de línea (defensivo, entrada malformada): indivisible.
+  return false;
+};

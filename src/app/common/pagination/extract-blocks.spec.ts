@@ -1,6 +1,7 @@
 import type { Delta, Op } from 'quill';
 
-import { extractBlocks } from './extract-blocks';
+import type { Block } from './block';
+import { extractBlocks, isSplittableBlock } from './extract-blocks';
 
 /** Fixture: Delta de documento a partir de ops literales. */
 const doc = (ops: readonly Op[]): Delta => ({ ops: [...ops] }) as unknown as Delta;
@@ -104,5 +105,61 @@ describe('extractBlocks', () => {
     const before = snapshot(ops);
     extractBlocks(doc(ops));
     expect(ops).toEqual(before);
+  });
+});
+
+describe('isSplittableBlock (spec 05, REQ-02)', () => {
+  const blockOf = (ops: readonly Op[]): Block => ({ id: 0, ops });
+
+  it('párrafo puro → divisible', () => {
+    expect(isSplittableBlock(blockOf([{ insert: 'hola mundo\n' }]))).toBe(true);
+  });
+
+  it('párrafo con formatos inline → divisible (bold no impide el corte)', () => {
+    expect(
+      isSplittableBlock(
+        blockOf([{ insert: 'hola ', attributes: { bold: true } }, { insert: 'mundo\n' }])
+      )
+    ).toBe(true);
+  });
+
+  it('párrafo con embed inline → divisible (la imagen pertenece a su línea)', () => {
+    expect(
+      isSplittableBlock(blockOf([{ insert: { image: 'x.png' } }, { insert: ' con texto\n' }]))
+    ).toBe(true);
+  });
+
+  it('párrafo con atributos que no son de no-párrafo (align) → divisible', () => {
+    expect(
+      isSplittableBlock(blockOf([{ insert: 'centrado\n', attributes: { align: 'center' } }]))
+    ).toBe(true);
+  });
+
+  it('heading → indivisible', () => {
+    expect(isSplittableBlock(blockOf([{ insert: 'Título\n', attributes: { header: 1 } }]))).toBe(
+      false
+    );
+  });
+
+  it('run de lista → indivisible', () => {
+    expect(isSplittableBlock(blockOf([{ insert: 'a\n', attributes: { list: 'bullet' } }]))).toBe(
+      false
+    );
+  });
+
+  it('blockquote → indivisible', () => {
+    expect(
+      isSplittableBlock(blockOf([{ insert: 'cita\n', attributes: { blockquote: true } }]))
+    ).toBe(false);
+  });
+
+  it('code-block → indivisible', () => {
+    expect(
+      isSplittableBlock(blockOf([{ insert: 'const x = 1;\n', attributes: { 'code-block': true } }]))
+    ).toBe(false);
+  });
+
+  it('sin op terminador (defensivo) → indivisible', () => {
+    expect(isSplittableBlock(blockOf([{ insert: 'sin salto' }]))).toBe(false);
   });
 });

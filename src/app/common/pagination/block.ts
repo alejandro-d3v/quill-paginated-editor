@@ -1,12 +1,13 @@
 import type { Op } from 'quill';
 
 /**
- * Vocabulario del seam de medición (discovery §4, spec 04 REQ-01).
+ * Vocabulario del seam de medición (discovery §4; specs 04 y 05).
  *
  * El motor de paginación consume bloques ya medidos: jamás mide ni toca
- * Angular/DOM (RULE-006). En esta spec `splittable` es SIEMPRE `false`
- * (bloques atómicos); la spec 05 lo habilitará para párrafos divisibles
- * (constitution §7.3).
+ * Angular/DOM (RULE-006). `splittable` es operativo desde la spec 05:
+ * `MeasurementService` lo fija con el predicado puro `isSplittableBlock`
+ * — solo los párrafos son divisibles en esta fase; la clasificación
+ * completa es de la spec 06 (RULE-019).
  */
 export type BlockId = number;
 
@@ -16,10 +17,30 @@ export interface Block {
   readonly ops: readonly Op[];
 }
 
-/** Bloque medido por la capa browser (`MeasurementService`). */
+/**
+ * Bloque medido por la capa browser (`MeasurementService`).
+ *
+ * Contratos de la spec 05:
+ * - `lineHeightsPx`: alturas de las líneas renderizadas en orden de flujo.
+ *   El productor SIEMPRE lo emite — `[]` para bloques indivisibles. Es
+ *   opcional en el tipo solo para que los fixtures de la spec 04 sigan
+ *   compilando sin editar (RULE-019); el motor lo trata con `?? []`.
+ * - `sum(lineHeightsPx) === heightPx` (regla de última línea, REQ-01):
+ *   la línea i (< última) mide `top_{i+1} − top_i`; la última completa
+ *   hasta `heightPx`. Mantiene los offsets acumulados de los indicadores
+ *   exactos (RULE-005, A1).
+ * - `minFragmentHeightPx`: altura mínima del fragmento inicial para que
+ *   un corte sea válido. En 05 = altura de la primera línea (huérfana
+ *   mínima: ≥ 1 línea por lado). Con el fallback de medición
+ *   (`lineHeightsPx = [heightPx]`) vale `heightPx` y el bloque queda de
+ *   facto atómico — degradación segura, nunca pierde contenido (REQ-03).
+ *   Afinar la huérfana (≥ 2 líneas) es calibración de la medición; afinar
+ *   la viuda (lado de continuación) exigirá extender el motor (spec 10).
+ */
 export interface MeasuredBlock {
   readonly id: BlockId;
   readonly heightPx: number;
   readonly splittable: boolean;
   readonly minFragmentHeightPx?: number;
+  readonly lineHeightsPx?: readonly number[];
 }

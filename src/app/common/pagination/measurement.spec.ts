@@ -18,6 +18,15 @@ const containerWithEditor = (childCount: number): HTMLElement => {
 /** Stub de rect (jsdom no mide): solo lo que el servicio lee. */
 const rect = (top: number, height: number): DOMRect => ({ top, height }) as unknown as DOMRect;
 
+/** Stub de Range con rects por línea (spec 05, REQ-06). */
+const fakeRange = (rects: readonly { top: number; height: number }[]): Range => {
+  const range = {
+    selectNodeContents: (): void => undefined,
+    getClientRects: (): readonly DOMRect[] => rects.map((r) => rect(r.top, r.height)),
+  };
+  return range as unknown as Range;
+};
+
 describe('MeasurementService.measure', () => {
   it('blocks vacío sin .ql-editor → [] (Quill aún no inicializó)', () => {
     const service = new MeasurementService();
@@ -44,8 +53,8 @@ describe('MeasurementService.measure', () => {
     const result = service.measure(blocks(2), container);
 
     expect(result).toEqual([
-      { id: 0, heightPx: 30, splittable: false }, // 40 − 10: flujo con espaciado
-      { id: 1, heightPx: 20, splittable: false }, // último: rect + margin (0 en jsdom)
+      { id: 0, heightPx: 30, splittable: false, lineHeightsPx: [] },
+      { id: 1, heightPx: 20, splittable: false, lineHeightsPx: [] },
     ]);
   });
 
@@ -57,6 +66,101 @@ describe('MeasurementService.measure', () => {
 
     const result = service.measure(blocks(1), container);
 
-    expect(result).toEqual([{ id: 0, heightPx: 42, splittable: false }]);
+    expect(result).toEqual([{ id: 0, heightPx: 42, splittable: false, lineHeightsPx: [] }]);
+  });
+});
+
+describe('MeasurementService.measure — medición de líneas (spec 05, REQ-06)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const paragraph = (id: number): Block => ({
+    id,
+    ops: [{ insert: 'línea uno\nlínea dos\n' }],
+  });
+  const heading = (id: number): Block => ({
+    id,
+    ops: [{ insert: 'T\n', attributes: { header: 1 } }],
+  });
+
+  const childrenOf = (container: HTMLElement): readonly HTMLElement[] =>
+    Array.from(container.querySelectorAll<HTMLElement>('.ql-editor > p'));
+
+  it('párrafo: lineHeightsPx por diferencia de tops; minFragment = primera línea; sum === heightPx', () => {
+    const service = new MeasurementService();
+    const container = containerWithEditor(2);
+    const children = childrenOf(container);
+    children[0]!.getBoundingClientRect = () => rect(10, 0); // alto irrelevante: no es el último
+    children[1]!.getBoundingClientRect = () => rect(40, 20); // flujo del primero: 40 − 10 = 30
+    vi.spyOn(document, 'createRange').mockReturnValue(
+      fakeRange([
+        { top: 10, height: 15 },
+        { top: 25, height: 15 },
+      ])
+    );
+
+    const result = service.measure([paragraph(0), heading(1)], container);
+
+    // Líneas: 25 − 10 = 15; la última completa hasta el flujo: 30 − 15 = 15.
+    expect(result[0]).toEqual({
+      id: 0,
+      heightPx: 30,
+      splittable: true,
+      lineHeightsPx: [15, 15],
+      minFragmentHeightPx: 15,
+    });
+    expect(result[1]).toEqual({ id: 1, heightPx: 20, splittable: false, lineHeightsPx: [] });
+  });
+
+  it('Range sin rects → fallback [heightPx] (bloque de facto atómico)', () => {
+    const service = new MeasurementService();
+    const container = containerWithEditor(1);
+    childrenOf(container)[0]!.getBoundingClientRect = () => rect(0, 30);
+    vi.spyOn(document, 'createRange').mockReturnValue(fakeRange([]));
+
+    const result = service.measure([paragraph(0)], container);
+
+    expect(result[0]).toEqual({
+      id: 0,
+      heightPx: 30,
+      splittable: true,
+      lineHeightsPx: [30],
+      minFragmentHeightPx: 30,
+    });
+  });
+
+  it('Range que lanza (entorno sin soporte) → mismo fallback determinista', () => {
+    const service = new MeasurementService();
+    const container = containerWithEditor(1);
+    childrenOf(container)[0]!.getBoundingClientRect = () => rect(0, 30);
+    const throwingRange = {
+      selectNodeContents: (): void => undefined,
+      getClientRects: (): readonly DOMRect[] => {
+        throw new Error('not implemented');
+      },
+    };
+    vi.spyOn(document, 'createRange').mockReturnValue(throwingRange as unknown as Range);
+
+    const result = service.measure([paragraph(0)], container);
+
+    expect(result[0]).toEqual({
+      id: 0,
+      heightPx: 30,
+      splittable: true,
+      lineHeightsPx: [30],
+      minFragmentHeightPx: 30,
+    });
+  });
+
+  it('bloque indivisible (heading) → lineHeightsPx: [] y sin minFragment', () => {
+    const service = new MeasurementService();
+    const container = containerWithEditor(1);
+    childrenOf(container)[0]!.getBoundingClientRect = () => rect(0, 30);
+
+    const result = service.measure([heading(0)], container);
+
+    expect(result[0]).toEqual({ id: 0, heightPx: 30, splittable: false, lineHeightsPx: [] });
+    expect('minFragmentHeightPx' in result[0]!).toBe(false);
   });
 });
