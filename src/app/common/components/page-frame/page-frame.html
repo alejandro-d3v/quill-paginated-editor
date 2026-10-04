@@ -1,0 +1,19 @@
+<div
+  class="page"
+  [style.width.px]="geometry().pageWidthPx"
+  [style.minHeight.px]="geometry().pageHeightPx"
+  [style.paddingTop.px]="geometry().marginTopPx"
+  [style.paddingRight.px]="geometry().marginRightPx"
+  [style.paddingBottom.px]="geometry().marginBottomPx"
+  [style.paddingLeft.px]="geometry().marginLeftPx"
+>
+  @if (geometry().headerHeightPx > 0) {
+    <div class="header-band" [style.height.px]="geometry().headerHeightPx"></div>
+  }
+  <div class="content-area" [style.width.px]="geometry().contentWidthPx">
+    <ng-content />
+  </div>
+  @if (geometry().footerHeightPx > 0) {
+    <div class="footer-band" [style.height.px]="geometry().footerHeightPx"></div>
+  }
+</div>

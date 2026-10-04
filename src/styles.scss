@@ -1,1 +1,28 @@
 /* You can add global styles to this file, and also import other style files */
+
+/*
+ * Overrides del tema Snow de Quill. Reubicados desde `editor.scss` (spec 03,
+ * REQ-04): el tema Snow ya es global y el único editor de la app vive dentro
+ * de `.editor-container`, por lo que el resultado visual no cambia.
+ */
+.ql-toolbar {
+  border: 1px solid #d9d9d9;
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+}
+
+.ql-container {
+  min-height: 300px;
+  border: 1px solid #d9d9d9;
+  border-radius: 0 0 8px 8px;
+  font-size: 16px;
+}
+
+.ql-editor {
+  min-height: 300px;
+
+  &.ql-blank::before {
+    color: #999;
+    font-style: normal;
+  }
+}

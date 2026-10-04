@@ -1,17 +1,23 @@
-import { AfterViewInit, Component, ElementRef, OnDestroy, output,ViewChild } from '@angular/core';
+import {
+  AfterViewInit,
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  OnDestroy,
+  output,
+  viewChild,
+} from '@angular/core';
 
 import Quill, { type Delta } from 'quill';
 
 @Component({
   selector: 'app-editor',
-  standalone: true,
-  imports: [],
   templateUrl: './editor.html',
   styleUrl: './editor.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class EditorComponent implements AfterViewInit, OnDestroy {
-  @ViewChild('editor', { static: true })
-  private editorElement!: ElementRef<HTMLDivElement>;
+  private readonly editorElement = viewChild.required<ElementRef<HTMLDivElement>>('editor');
   private quill: Quill | null = null;
   readonly deltaChange = output<Delta>();
 
@@ -33,7 +39,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
   };
 
   private initializeEditor(): void {
-    const quill = new Quill(this.editorElement.nativeElement, {
+    const quill = new Quill(this.editorElement().nativeElement, {
       theme: 'snow',
       placeholder: 'Escribe aquí...',
       modules: {

@@ -5,9 +5,9 @@ import type { Delta } from 'quill';
 import { EditorComponent } from './editor';
 
 /**
- * Stub de Quill (REQ-06): jsdom no implementa todas las APIs de selección que
- * Quill necesita. La instancia real sigue cubierta indirectamente por
- * `home.spec.ts`, que monta el editor sin mock.
+ * Stub de Quill (spec 01, REQ-06): jsdom no implementa todas las APIs de
+ * selección que Quill necesita. La instancia real sigue cubierta
+ * indirectamente por `home.spec.ts`, que monta el editor sin mock.
  */
 const quillMock = vi.hoisted(() => {
   const textChangeHandlers: Array<() => void> = [];
@@ -73,5 +73,15 @@ describe('Editor', () => {
     fixture.destroy();
 
     expect(quillMock.offEvents).toContain('text-change');
+  });
+
+  it('expone semántica ARIA de editor en el contenedor', () => {
+    const native: HTMLElement = fixture.nativeElement;
+    const textbox = native.querySelector<HTMLElement>('[role="textbox"]');
+    expect(textbox).not.toBeNull();
+    if (textbox !== null) {
+      expect(textbox.getAttribute('aria-label')).toBe('Editor de documento');
+      expect(textbox.getAttribute('aria-multiline')).toBe('true');
+    }
   });
 });

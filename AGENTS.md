@@ -54,7 +54,7 @@ This is the operational manual for AI coding agents working in this repository. 
 ## 1\. Repository Overview
 
 - **Product**: A paginated document editor built on top of [Quill 2.x](<https://quilljs.com/>) — content is displayed as physical pages (A4/Letter/Legal, orientation, margins, headers/footers, page numbers, page breaks) instead of one continuous editor.
-- **Status**: Experimental MVP under active development. The app is a root shell with lazy routing plus a `home` feature page hosting the Quill wrapper (`common/editor`, migrated in spec 01). The wrapper **is implemented** (`EditorComponent`: snow theme, full toolbar, Quill instantiated in `ngAfterViewInit`) and **exposes the canonical Delta via `deltaChange: output<Delta>()` on every `text-change`**; `ngOnDestroy` disconnects the listener. Known wrapper debt (redundant `standalone: true`, empty `imports`, no `OnPush`, `@ViewChild`, no ARIA, `::ng-deep`) — touch only what the current spec requires (RULE-019); those belong to `03-visual-pages`. Domain vocabulary (types, defaults, validation) lives under `common/document/`; page geometry (mm↔px conversion, page dimensions, content area per §7.1) lives under `common/pagination/` (specs 01–02). No pagination, measurement, or PDF exists yet. Expect significant API/architecture churn; consult `README.md` and the active spec before large changes.
+- **Status**: Experimental MVP under active development. The app is a root shell with lazy routing plus a `home` feature page hosting the Quill wrapper (`common/editor`, migrated in spec 01). The wrapper **is implemented** (`EditorComponent`: snow theme, full toolbar, Quill instantiated in `ngAfterViewInit`) and **exposes the canonical Delta via `deltaChange: output<Delta>()` on every `text-change`**; `ngOnDestroy` disconnects the listener. The wrapper follows repo conventions (OnPush, `viewChild()` signal query, ARIA on the editor surface, no `standalone: true`/`imports: []`/`::ng-deep` — resolved by spec 03; its `.ql-*` overrides live in global `styles.scss`). Domain vocabulary (types, defaults, validation) lives under `common/document/`; page geometry (mm↔px conversion, page dimensions, content area per §7.1) lives under `common/pagination/` (specs 01–02); the visual page shell — `PagesContainer` (canvas) + `PageFrame` (consuming `PageGeometry`) — lives under `common/components/` and wraps the editor in a continuous pre-pagination frame (A1, spec 03). No pagination, measurement, or PDF exists yet. Expect significant API/architecture churn; consult `README.md` and the active spec before large changes.
 
 ### Non-negotiable product principles
 
@@ -103,6 +103,7 @@ src/
     ├── app.config.ts
     ├── app.routes.ts
     ├── common/
+    │   ├── components/
     │   ├── document/
     │   ├── editor/
     │   └── pagination/

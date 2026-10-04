@@ -5,32 +5,34 @@ aporte. Las reglas permanentes viven en `AGENTS.md`, no aquí.
 
 ## Estado actual
 
-- **02-page-geometry COMPLETA** (2026-10-03): `common/pagination/` con `unit-converter` (mm↔px) y `page-geometry` (dimensiones, §7.1, sanidad geométrica). Funciones puras, sin Angular/DOM (RULE-006).
-- Suite verde: 31 tests / 6 archivos (18 de geometría). Lint 0/0; build 221.4 kB initial (sin cambios: la app aún no consume la geometría — lo harán 03/04).
-- `AGENTS.md` sincronizado (§1 estado, §3 árbol) tras añadir `common/pagination/`.
-- Warning de build preexistente: `quill-delta` CommonJS (mitigación futura `allowedCommonJsDependencies`, requiere aprobación).
-- Pendiente de 03: overlay visual; de 04: medición + motor.
+- **03-visual-pages COMPLETA** (2026-10-04): `common/components/` con `PageFrame` (geometría de 02 por `input.required`, bandas reservadas condicionales, flujo header→contenido→footer) + `PagesContainer` (canvas). `home` compone canvas → marco → editor con `settings` signal + `geometry` computed (OnPush).
+- Wrapper alineado a convenciones (OnPush, `viewChild.required` signal, ARIA en `#editor`, sin `standalone: true`/`imports: []`/`::ng-deep`); overrides `.ql-*` reubicados en `styles.scss` (declaraciones byte-idénticas). Deuda de 01 REQ-07: **resuelta**.
+- Pre-paginación (A1): una sola página continua (`min-height` = página); footer fluye al final del contenido; indicadores → 04.
+- Suite verde: 40 tests / 8 archivos. Lint 0/0; build 231.4 kB initial (+9.9 kB por el caparazón). Warning preexistente `quill-delta` CommonJS.
+- `AGENTS.md` sincronizado (§1 estado, §3 árbol).
 
-## Decisiones (00-discovery en `docs/discovery.md`; 01–02 aquí)
+## Decisiones (00-discovery en `docs/discovery.md`; 01–03 aquí)
 
-- **02 — estándar CSS fijo**: px CSS = 1/96 in; 1 in = 25.4 mm → conversión determinista (RULE-005). El redondeo de render es de 03.
-- **02 — validador geométrico de una sola ruta**: `isValidPageGeometry` deriva de `computePageGeometry` (`contentWidthPx > 0 && contentHeightPx > 0`); las sumas de §7.1 son justificación, no fórmula paralela. Complementa al estructural de 01 (pipeline: structural → geométrico).
-- **02 — tests con física independiente**: `toPx` local en el spec (96/25.4 inline, sin importar `mmToPx`) y dimensiones ISO/US hardcodeadas — evita tautología y el trap de ulps (`toBeCloseTo ≥ 6` para todo px).
-- **01** — `import type { Delta } from 'quill'`; validador estructural sobre `unknown`; wrapper en `common/editor/` con `deltaChange: output<Delta>()`.
+- **03 — orden de flujo del marco**: header → contenido → footer, anclado a `contentYPx` de 02 (§7.1); bandas vacías (contenido de bandas es de 08).
+- **03 — overrides `.ql-*` globales** en `styles.scss`: Snow ya es global y solo existe un editor → mismo resultado visual sin `::ng-deep`.
+- **03 — ARIA a nivel de contenedor** `#editor` (patrón skill `quill-wrapper`): `role="textbox"`, `aria-label`, `aria-multiline`. AXE manual queda como revisión humana (no hay tooling; RULE-017).
+- **02/03 — aserciones de styles en jsdom**: `parseFloat` + `toBeCloseTo ≥ 6` con `toPx` independiente; nunca strings de floats.
+- **01** — `import type { Delta } from 'quill'`; validador estructural sobre `unknown`; wrapper en `common/editor/` con `deltaChange`.
 
 ## Aprendizajes y errores a evitar
 
-- En tests de lógica matemática: escribir la fórmula esperada inline en el spec (verificación independiente), nunca importar la función bajo test.
-- Restar-en-mm-convertir ≠ convertir-ya-restar en float: siempre `toBeCloseTo` (≥6) para px; `toBe` solo con literales idénticos (mm de la tabla).
-- `simple-import-sort` ordena especificadores nombrados: correr `npm run lint:fix` tras crear archivos.
-- Alias `@common` sigue sin resolver: imports relativos.
-- Skills aún citan rutas/numeración desfasadas: corregir solo con aprobación (discovery §8).
+- `ComponentFixture.nativeElement` está tipado `any`: los genéricos `querySelector<HTMLElement>` sobre él fallan con TS2347 — asignar primero `const native: HTMLElement = fixture.nativeElement`.
+- `input.required` en TestBed: `fixture.componentRef.setInput(...)` ANTES del primer `whenStable()`.
+- Sub-bullets `-` anidados dentro de ítems `- [ ]` rompen la idempotencia de Prettier en tasks.md — usar prosa.
+- En tests de lógica matemática: fórmula esperada inline, nunca importar la función bajo test; `toBeCloseTo ≥ 6` para px.
+- Alias `@common` no resuelve: imports relativos. Skills citan secciones AGENTS.md por número desfasado: por nombre.
 
 ## Próximos pasos
 
-- **Redactar `03-visual-pages`** (siguiente spec; hoy es plantilla → necesita `/spec-write` antes de `/feature`). Consume: `deltaChange` (01) + `computePageGeometry` (02); hace el overlay A1 y el refactor de convenciones del wrapper (OnPush, ARIA, `::ng-deep`).
+- **Redactar `04-pagination-mvp`** (plantilla → `/spec-write`; luego review + feature). Es el núcleo: consume `deltaChange` + `computePageGeometry`; define `MeasuredBlock`/`extractBlocks`/`MeasurementService` (seam, discovery §4), `paginate` puro, `LayoutDocument` e indicadores de salto; la invariants suite nace ahí.
 
 ## Pendientes / dudas abiertas
 
 - PDF (09) · tablas 06b · virtualización (10) · widows/orphans (05) · render de header/footer: tokens vs Delta (08).
-- Corregir referencias cruzadas de skills y ubicar/eliminar `temp/pagination-spec/` — requieren aprobación del usuario.
+- Revisión manual humana en navegador de 03 (apariencia + AXE) — recomendada, no bloqueante.
+- Corregir referencias cruzadas de skills y ubicar/eliminar `temp/pagination-spec/` — requieren aprobación.
