@@ -66,8 +66,12 @@ En `src/app/common/pagination/block.ts` y `paginate.ts` MUST:
 - `minFragmentHeightPx` (declarado en 04) pasa a operativo: altura mínima
   que el fragmento inicial debe alcanzar para que un corte sea válido.
   En esta spec = altura de la primera línea del bloque (regla de
-  huérfanas mínima: ≥ 1 línea por lado). Afinar viudas/huérfanas (≥ 2
-  líneas) es un cambio de calibración en la medición, sin tocar el motor.
+  huérfanas mínima: ≥ 1 línea por lado, garantizado estructuralmente —
+  el fragmento inicial contiene la línea 0 y la continuación conserva al
+  menos una línea). Afinar la **huérfana** (lado inicial, ≥ 2 líneas) es
+  calibración de la medición; afinar la **viuda** (lado de continuación)
+  exigirá extender el motor con un chequeo simétrico — anotado para la
+  spec 10, no es trabajo de esta spec.
 - Contrato de consistencia de flujo: `sum(lineHeightsPx) === heightPx`
   del bloque (la misma altura de flujo de 04). Regla de cierre: la línea
   i (< última) mide `top_{i+1} − top_i` (geometría de line boxes); la
@@ -108,7 +112,13 @@ bloque con `isSplittableBlock(block) === true`:
 - Emitir `splittable: isSplittableBlock(block)` — deja de ser siempre
   `false` — y `minFragmentHeightPx: lineHeightsPx[0]`.
 - Fallback determinista cuando el `Range` no produce rects (p. ej. jsdom o
-  contenido vacío): `lineHeightsPx = [heightPx]`.
+  contenido vacío): `lineHeightsPx = [heightPx]` — con la consecuencia de
+  que `minFragmentHeightPx = heightPx` y el bloque se degrada a
+  **atómico** (corte imposible). Degradación segura y determinista: nunca
+  pierde contenido (RULE-011).
+- Si la agrupación por `top` no es exacta (imágenes inline producen
+  varios rects por línea), la regla de cierre mantiene la suma exacta —
+  el desvío queda contenido dentro del bloque (ver riesgos del plan).
 - Para bloques indivisibles: `lineHeightsPx = []`,
   `minFragmentHeightPx` ausente, `splittable: false` — exactamente como
   en 04.
@@ -125,6 +135,9 @@ constitution §7.2/§7.3/§7.5):
   fragmento `{ id, heightPx: suma colocada, lineRange: { from, to } }`
   en la página actual, se cierra la página y el bloque **continúa** en la
   siguiente (§7.3) — pudiendo cortarse de nuevo (párrafos multi-página).
+  Nota: al valor de esta spec, todo fragmento inicial contiene la línea 0
+  y por tanto alcanza `minFragmentHeightPx` — el chequeo es el hook del
+  contrato de tuning (discovery §4), no una restricción activa aquí.
 - Si la primera línea del bloque no cabe en la página actual, el bloque
   arranca en la página siguiente sin cortar (§7.4 a nivel de bloque).
 - Una línea más alta que una página completa se coloca sola en su
@@ -224,7 +237,8 @@ Esta spec MUST NOT:
 - Contenido y numeración de header/footer (08).
 - Renderizado PDF por `lineRange` (09).
 - Debouncing, invalidación incremental, cacheo, virtualización y
-  calibración de viudas/huérfanas (10 — el mecanismo queda listo: solo
-  cambia cómo la medición fija `minFragmentHeightPx`).
+  afinado de viudas/huérfanas (10 — la huérfana es calibración de la
+  medición vía `minFragmentHeightPx`; la viuda requiere la extensión
+  simétrica del motor anotada en REQ-01).
 - Cambios en la vista, el wrapper o el DOM del editor (RULE-015/019).
 - Trabajo no relacionado; optimización prematura (constitution §11).
