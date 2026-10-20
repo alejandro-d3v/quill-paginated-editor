@@ -5,10 +5,11 @@ aporte. Las reglas permanentes viven en `AGENTS.md`, no aquí.
 
 ## Estado actual
 
-- **07-manual-page-breaks COMPLETA** (2026-10-04): Blot `pageBreak` (BlockEmbed, `{ insert: { pageBreak: true } }`, `role="separator"`) + botón de toolbar con handler + `BlockKind 'page-break'` + `MeasuredBlock.manualBreakAfter` + cierre manual declarado en el camino atómico (guarda anti-doble-cierre: si desborda, la página del marcador ya se cerró). Suite 131/131, lint/build verdes, verificado en navegador (Edge headless + CDP).
-- **06-complex-blocks COMPLETA**: `blockKind` + matriz de divisibilidad (heading y page-break indivisibles); listas cortan en fronteras de `<li>`; imágenes async (`imagesReady`).
-- Aún sin: header/footer (08), PDF (09), incremental/viudas (10), tablas (06b o descope).
-- **Offset del toolbar SIN ASIGNAR** (hallazgo de 04/05): nuevo dato de la verificación de 07 — con las alturas de flujo de 05, la frontera cae solo ~3–5px por encima del fondo visual del marcador (75 vs 78; 104 vs 109). El "66px" anterior puede haber sido absorbido por la regla de última línea de 05; RE-MEDIR antes de asignar el fix. Decisión humana: parche / spec / diferir a 10.
+- **07-manual-page-breaks COMPLETA** (2026-10-04): Blot `pageBreak` (BlockEmbed, `{ insert: { pageBreak: true } }`, `role="separator"`) + botón de toolbar + `BlockKind 'page-break'` + `MeasuredBlock.manualBreakAfter` + cierre manual declarado (guarda anti-doble-cierre). Suite 131/131, lint/build verdes. **El usuario delegó y ejecuté la revisión runtime de 04–07** (Edge headless + CDP): 04 natural ✓, 05 split de párrafo largo en runtime ✓, 06 listas vía botones reales ✓ (split específico: evidencia parcial, cubierto por tests), 07 marcador + ARIA ✓, cero errores de consola. Imagen async: paste sintético rechazado por el navegador — cubierta por tests de 06; ocular humana con drag&drop opcional.
+- **06-complex-blocks COMPLETA**: `blockKind` + matriz (heading y page-break indivisibles); listas cortan en fronteras de `<li>`; imágenes async (`imagesReady`).
+- Aún sin: header/footer (08), PDF (09), incremental/viudas (10).
+- **DECISIÓN offset del toolbar (delegada; medido, no parcheado)**: coordenadas absolutas confirman deriva de **−78px en TODAS las fronteras** dibujadas + página 1 sobrecargada ~68px. Raíz: el toolbar (66px) renderiza DENTRO del content-area de la página y `.breaks` dibuja desde el top del content-area, mientras el motor acumula desde el primer bloque de texto (78px de chrome en medio). La medición "Δ3px" de 07 era ERROR mío (comparé offsetTop en dos espacios de coordenadas). **Se resuelve con mini-spec dedicada ANTES de 08** (toolbar fuera del marco + origen del overlay = origen del flujo); 08 (bandas/`contentYPx`) la requiere como prerrequisito. Sin parche fuera de ciclo.
+- **DECISIÓN tablas (delegada): DESCOPE.** El módulo table de Quill 2 es minimal; soporte real exige unidades por fila + repetición de cabecera = épica propia, no un 06b. Bloques desconocidos hoy: indivisibles + fail-fast de desalineo (RULE-011). Gatillo de revisita: demanda real de tablas.
 
 ## Decisiones (00-discovery en `docs/discovery.md`; 01–07 aquí)
 
@@ -32,11 +33,10 @@ aporte. Las reglas permanentes viven en `AGENTS.md`, no aquí.
 
 ## Próximos pasos
 
-- Esperar commit del usuario de 07; luego `/spec-write 08-header-footer` cuando lo pida.
-- Re-medir el offset de toolbar (ver Estado actual) y decidir: parche / spec / 10. Tablas: 06b o descope.
-- Revisión humana en navegador pendiente de 04–07 (hard-reload primero; AXE sobre botón y marcador).
+- Esperar commit del usuario de 07; luego `/spec-write` de la mini-spec **"toolbar fuera del marco + origen del overlay"** (prerrequisito de 08) cuando lo pida; después 08-header-footer.
+- Tablas: descope decidido (ver Estado actual). Opcional humano: drag&drop de una imagen en dev-server (hard-reload primero) para el check ocular async; AXE completo opcional.
 
 ## Pendientes / dudas abiertas
 
-- PDF (09) · tablas 06b · virtualización/viudas (10) · header/footer: tokens vs Delta (08).
+- PDF (09) · virtualización/viudas (10) · header/footer: tokens vs Delta (08).
 - Corregir referencias cruzadas de skills y ubicar/eliminar `temp/pagination-spec/` — requieren aprobación del usuario.

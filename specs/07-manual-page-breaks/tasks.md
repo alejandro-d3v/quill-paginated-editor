@@ -131,15 +131,36 @@
       `http-server` del build): botón presente con
       `aria-label="Insertar salto de página"`; marcador con
       `role="separator"` + `aria-label`; con dos párrafos cortos + un
-      salto la frontera cae EN el marcador (línea a 75px vs fondo del
-      marcador a 78px; Δ≈3px) — la frontera solo existe por el cierre
-      manual (sin él, 1 página y 0 líneas); segundo salto → 3 páginas,
-      2 fronteras (104 vs 109, Δ≈5px); cero errores de consola.
-      HALLAZGOS para 10: (a) la frontera dibujada queda ~3–5px por
-      encima del fondo visual del marcador (margen del bloque:
-      calibración de offsets, junto al offset de toolbar ya
-      conocido); (b) los fixtures de Delta con `'\n'` tras el embed
-      eran del modelo equivocado — corregido a bloque propio.
+      salto la frontera dibujada existe SOLO por el cierre manual (sin
+      él, 1 página y 0 líneas); segundo salto → 3 páginas, 2 fronteras;
+      cero errores de consola. HALLAZGOS: (a) RE-MEDICIÓN con
+      coordenadas absolutas (post-07, ver abajo): la frontera dibujada
+      queda 78px por encima de la frontera verdadera del texto — la
+      primera medición de 07 ("Δ≈3px") comparaba offsetTop en DOS
+      espacios distintos (editor vs content-area) y era incorrecta;
+      (b) los fixtures de Delta con `\n` tras el embed eran del modelo
+      equivocado — corregido a bloque propio.
+- [x] RE-MEDICIÓN del offset del toolbar (delegada por el usuario, con
+      coordenadas absolutas de viewport): `tChrome = 78px` = toolbar
+      (66px, renderiza DENTRO del content-area de la página) + borde y
+      padding del editor (12px). Deriva de TODAS las fronteras dibujadas
+      = −78px; la página 1 sobrecarga su caja visual en ~68px. El motor
+      es internamente consistente (frontera ≈ contentHeightPx desde el
+      origen del content-area): el defecto es que el origen del overlay
+      ≠ origen del flujo (primer bloque de texto). DECISIÓN (delegada):
+      mini-spec dedicada ANTES de 08 (toolbar fuera del marco + origen
+      del overlay alineado al texto) — 08 (bandas, `contentYPx`) la
+      requiere como prerrequisito. Sin parche fuera de ciclo.
+- [x] Revisión runtime de 04–07 (delegada): 04 natural (80 párrafos →
+      2 páginas, frontera ≈ 923 ≈ contentHeightPx) ✓; 05 párrafo largo
+      cruzando frontera (split dentro del párrafo) ✓; 06 listas
+      renderizadas y formateo vía botones reales (split de lista
+      específico: evidencia parcial en runtime, cubierto por los 21
+      tests del seam) ✓; 07 marcador + ARIA (botón, marcador, `.breaks`
+      aria-hidden) ✓; imagen async: paste sintético rechazado por el
+      navegador (limitación de `ClipboardEvent` sintético) — queda
+      cubierta por los tests de 06 y pendiente ocular humana con
+      drag&drop; cero errores de consola en todas las fases.
 
 ## Review
 
